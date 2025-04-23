@@ -1,0 +1,5 @@
+# ignore .csv files in data/merged and data/raw
+/data/merged/*.csv
+/data/raw/*.csv
+/data/raw/*.dmp
+/data/raw/*.tsv
