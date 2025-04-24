@@ -4,7 +4,7 @@ import pandas as pd
 pd_trimmed = pd.read_csv('data/raw/trimmed.tsv', sep='\t', header=0, names=['seqID', 'taxID', 'sequence'], dtype=str)
 pd_trimmed['seqID'] = pd_trimmed['seqID'].astype(str)
 pd_trimmed['taxID'] = pd_trimmed['taxID'].astype(str)
-pd_trimmed['sequence'] = pd_trimmed['sequence'].astype(str)
+pd_trimmed['sequence'] = pd_trimmed['sequence'].astype(str).str.upper()
 print(pd_trimmed.head())
 pd_trimmed.to_csv('data/raw/trimmed.csv', index=False)
 
