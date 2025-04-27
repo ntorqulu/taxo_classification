@@ -1,0 +1,22 @@
+{
+    "cleaning_params": {
+      "input_file": "data/merged/final_taxonomy.csv",
+      "output_dir": "data/processed/custom",
+      
+      "min_seq_length": 150,
+      "max_n_percent": 2.5,
+      "require_complete_ranks_up_to": "class",
+      "remove_duplicates": true,
+      "filter_nonstandard_bases": true,
+      "enforce_taxonomy_consistency": true,
+      "filter_gc_outliers": true,
+      "keep_approximations": true,
+      "merge_rare_classes": true,
+      "min_count_per_class": 5,
+      
+      "balance": "undersample",
+      "balance_rank": "phylum_name",
+      "balance_ratio": 50,
+      "random_seed": 42
+    }
+  }
