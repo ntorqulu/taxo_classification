@@ -4,11 +4,11 @@ import os
 # Constants
 TAXONOMY_RANKS = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 RANK_MAPPINGS = {
-    'kingdom': ['subkingdom', 'superkingdom'],
-    'phylum': ['subphylum', 'superphylum'],
-    'class': ['subclass', 'superclass', 'infraclass'],
-    'order': ['suborder', 'superorder', 'infraorder', 'parvorder'],
-    'family': ['subfamily', 'superfamily'],
+    'kingdom': ['subkingdom', 'superphylum'],
+    'phylum': ['subphylum', 'superclass'],
+    'class': ['subclass', 'infraclass'],
+    'order': ['suborder', 'infraorder', 'parvorder'],
+    'family': ['subfamily', 'supergenus'],
     'genus': ['subgenus'],
     'species': ['subspecies', 'species group', 'species subgroup', 'forma', 'varietas']
 }
@@ -158,7 +158,7 @@ def main():
     final_df = build_taxonomic_dataframe(seq_df, sci_names_dict, parent_dict, rank_dict)
     
     # Save results
-    output_path = f'{output_dir}/final_taxonomy.csv'
+    output_path = f'{output_dir}/filled_blanks.csv'
     print(f"\nSaving results to {output_path}")
     final_df.to_csv(output_path, index=False)
     
