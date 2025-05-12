@@ -136,34 +136,6 @@ class TaxonomyDataCleaner:
         self.logger.info(f"Keeping {mask.sum()} of {len(df)} sequences after GC content filter")
         return mask
     
-    def clean_approximated_names(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Clean approximated taxonomic names by removing the approximation source.
-        
-        Parameters:
-        -----------
-        df : pandas.DataFrame
-            DataFrame with taxonomic information
-            
-        Returns:
-        --------
-        pandas.DataFrame
-            DataFrame with cleaned taxonomic names
-        """
-        self.logger.info("Cleaning approximated taxonomic names")
-        
-        # Create a copy to avoid modifying the original
-        cleaned_df = df.copy()
-        
-        # Clean each taxonomic rank
-        for rank in TAXONOMY_RANKS:
-            col = f"{rank}_name"
-            if col in cleaned_df.columns:
-                # Extract the name before " (from ...)"
-                cleaned_df[col] = cleaned_df[col].str.replace(r' \(from .*\)$', '', regex=True)
-        
-        return cleaned_df
-    
     def require_complete_ranks(self, df: pd.DataFrame, up_to_rank: Optional[str] = "order") -> pd.Series:
         """
         Filter records that have incomplete taxonomic information up to a certain rank.
@@ -324,7 +296,6 @@ class TaxonomyDataCleaner:
         df: pd.DataFrame,
         min_seq_length: int = 100,
         max_n_percent: float = 5.0,
-        keep_approximations: bool = True,
         require_complete_ranks_up_to: Optional[str] = "order",
         remove_duplicates: bool = True,
         filter_nonstandard_bases: bool = True,
@@ -344,8 +315,6 @@ class TaxonomyDataCleaner:
             Minimum acceptable sequence length
         max_n_percent : float
             Maximum acceptable percentage of N bases
-        keep_approximations : bool
-            Whether to keep approximated taxonomic names
         require_complete_ranks_up_to : str or None
             Require all taxonomic ranks up to this level to be non-null
             Options: "superkingdom", "kingdom", "phylum", "class", "order", "family", "genus", "species", None
@@ -403,10 +372,6 @@ class TaxonomyDataCleaner:
         
         # Apply filters so far to reduce dataset size for subsequent operations
         working_df = working_df[mask].copy()
-        
-        # 5. Handle approximated names
-        if not keep_approximations:
-            working_df = self.clean_approximated_names(working_df)
         
         # 6. Check taxonomic consistency
         if enforce_taxonomy_consistency:
@@ -492,7 +457,6 @@ if __name__ == "__main__":
             df,
             min_seq_length=299,
             max_n_percent=0.0,
-            keep_approximations=True,
             require_complete_ranks_up_to="species",
             remove_duplicates=True,
             filter_nonstandard_bases=True,
