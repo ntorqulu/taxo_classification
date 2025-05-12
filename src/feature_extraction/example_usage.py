@@ -70,7 +70,7 @@ def main():
     logger.info("Setting up feature extractors")
     
     # K-mer based features
-    kmer3_encoder = KmerEncoder(k=3, mode='frequency')
+    kmer3_encoder = KmerEncoder(k=3, mode='count')
     
     # Create the feature extractor
     extractor = FeatureExtractor()
@@ -86,7 +86,7 @@ def main():
         sequences, 
         encoders=['kmer3'],
         concatenate=True,
-        normalize=True
+        normalize=False
     )
     
     # Get feature names
