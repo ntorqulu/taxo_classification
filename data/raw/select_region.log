@@ -1,0 +1,55 @@
+####
+2025-04-29-15-54-31
+PARAMETERS:
+bait_fas: 
+cutadapt_path: 
+e_pcr: 1
+fw: GGWACWRGWTGRACWNTNTAYCCYCC
+identity: 0.7
+max_amplicon_length: 320
+min_amplicon_length: 299
+min_overlap: 20
+outdir: /home/aantich/Nextcloud/2_PROJECTES/AIDL-project/taxo_classification/data/raw/
+rv: TANACYTCNGGRTGNCCRAARAAYCA
+tcov: 0.5
+trim_error: 0.3
+tsv: /home/aantich/Nextcloud/2_PROJECTES/NJORDR-MJOLNIR3/NJORDR_COI/COMPLETE_DB/NJORDR_sequences.tsv
+vsearch_path: 
+####
+
+
+####
+Make fasta file from input tsv
+Runtime: 98s 
+
+####
+e-PCR with cutadapt
+Runtime: 34s 
+
+####
+Make a fasta with sequences untrimmed by cutadapt
+Runtime: 10s 
+
+####
+Cluster trimmed sequneces or input bait_fas
+Runtime: 55s 
+
+####
+vsearch --usearch_global sequences against centroids
+Runtime: 3253s 
+
+####
+Trim usearch_global hits
+Runtime: 183s 
+
+####
+
+1. Number of sequences in the input fasta file: 3254500
+2. Number of sequences in the cutadapt trimmed file: 216149
+3. Number of sequences in the cutadapt untrimmed file: 3038351
+4. Number of centroids: 37033
+5. Number of sequences trimmed based on usearch_global: 2953229
+6. Number of sequences untrimmed after usearch_global: 85122
+7. Total number of trimmed sequences: 3169378
+8. Total number of untrimmed sequences: 85122
+Total runtime: 3634 s
