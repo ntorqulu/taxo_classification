@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import torch
-
 class SequenceCoder:
     def __init__(self):
         """
@@ -22,7 +21,7 @@ class SequenceCoder:
 
     # the code for the kmer is based on a modification from https://github.com/MindAI/kmer/
 
-    def kmerize_one_seq(self, sequence, k, write_number_of_occurrences=False):
+    def kmerize_one_seq(self, sequence, k, write_number_of_occurrences=True):
         """
         Given a DNA sequence, return the 1-hot representation of its kmer feature.
 
@@ -158,9 +157,7 @@ class SequenceCoder:
 
     
 if __name__ == "__main__":
-    # if this script is run directly, there are some args that can be passed
-    # to the script
-    # input; output; label_column; sequence_column; coding_method
+    # if this script is run directly, it runs an example of how it works
 
     # the output formats can be the following:
     # i.e. for seq ACGTCG:
@@ -201,15 +198,57 @@ if __name__ == "__main__":
         # 2 digits
             # 00 01 10 11 01 00
 
+    print("Example usage of SequenceCoder")
+
     sequences = SequenceCoder()
     sequences.load_sequences("data/small_dataset.csv")
-    sequences.coding_kmer(k=2)
+    print('output of the kmer coding when loading data from a file')
+    print('For k = 1:')
+    print(sequences.coding_kmer(k=1))
+    print('For k = 2:')
+    print(sequences.coding_kmer(k=2))
+    print('For k = 3:')
+    print(sequences.coding_kmer(k=3))
+    print('For k = 4:')
+    print(sequences.coding_kmer(k=4))
+
+    print('One-hot-encoding:')
+    print('as a matrix:')
+    print(sequences.coding_one_hot_4rowMatrix())
+    print('as a 1D array:')
+    print('4 digits per letter:')
+    print(sequences.coding_one_hot_bit(bits=4))
+    print('3 digits per letter:')
+    print(sequences.coding_one_hot_bit(bits=3))
+    print('2 digits per letter:')
+    print(sequences.coding_one_hot_bit(bits=2))
+    print('1 digit per letter:')
+    print(sequences.coding_one_hot_bit(bits=1))
 
     # externally loaded:
+    print
     file_path = "data/small_dataset.csv"
     entries = pd.read_csv(file_path)
     sequences = list(entries.sequence)
     coder = SequenceCoder()
-    coder.coding_kmer(sequences = sequences, k=2)
-    coder.coding_one_hot_4rowMatrix(sequences = sequences)
-    coder.coding_one_hot_bit(sequences = sequences, bits=2)
+    print('output of the kmer coding when loading data from a file')
+    print('For k = 1:')
+    print(coder.coding_kmer(sequences = sequences, k=1))
+    print('For k = 2:')
+    print(coder.coding_kmer(sequences = sequences, k=2))
+    print('For k = 3:')
+    print(coder.coding_kmer(sequences = sequences, k=3))
+    print('For k = 4:')
+    print(coder.coding_kmer(sequences = sequences, k=4))
+    print('One-hot-encoding:')
+    print('as a matrix:')
+    print(coder.coding_one_hot_4rowMatrix(sequences = sequences))
+    print('as a 1D array:')
+    print('4 digits per letter:')
+    print(coder.coding_one_hot_bit(sequences = sequences, bits=4))
+    print('3 digits per letter:')
+    print(coder.coding_one_hot_bit(sequences = sequences, bits=3))
+    print('2 digits per letter:')
+    print(coder.coding_one_hot_bit(sequences = sequences, bits=2))
+    print('1 digit per letter:')
+    print(coder.coding_one_hot_bit(sequences = sequences, bits=1))
