@@ -5,6 +5,7 @@
 /data/raw/*.tsv
 /data/processed/*.csv
 /data/features/*.csv
+/data/filtered/*.csv
 
 # delete all files called structure.txt in any subdirectory
 **/structure.txt
