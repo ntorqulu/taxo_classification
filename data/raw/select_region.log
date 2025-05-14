@@ -1,0 +1,55 @@
+####
+2025-05-12-21-04-01
+PARAMETERS:
+bait_fas: 
+cutadapt_path: 
+e_pcr: 1
+fw: GGWACWRGWTGRACWNTNTAYCCYCC
+identity: 0.7
+max_amplicon_length: 320
+min_amplicon_length: 299
+min_overlap: 20
+outdir: data/raw
+rv: TANACYTCNGGRTGNCCRAARAAYCA
+tcov: 0.5
+trim_error: 0.3
+tsv: data/raw/NJORDR_sequences.tsv
+vsearch_path: 
+####
+
+
+####
+Make fasta file from input tsv
+Runtime: 91s 
+
+####
+e-PCR with cutadapt
+Runtime: 15s 
+
+####
+Make a fasta with sequences untrimmed by cutadapt
+Runtime: 9s 
+
+####
+Cluster trimmed sequneces or input bait_fas
+Runtime: 26s 
+
+####
+vsearch --usearch_global sequences against centroids
+Runtime: 1739s 
+
+####
+Trim usearch_global hits
+Runtime: 190s 
+
+####
+
+1. Number of sequences in the input fasta file: 3254500
+2. Number of sequences in the cutadapt trimmed file: 210563
+3. Number of sequences in the cutadapt untrimmed file: 3043937
+4. Number of centroids:    36232
+5. Number of sequences trimmed based on usearch_global: 2953080
+6. Number of sequences untrimmed after usearch_global: 90857
+7. Total number of trimmed sequences: 3163643
+8. Total number of untrimmed sequences: 90857
+Total runtime: 2070 s
