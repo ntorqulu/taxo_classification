@@ -226,7 +226,7 @@ if __name__ == "__main__":
     print(sequences.coding_one_hot_bit(bits=1))
 
     # externally loaded:
-    print
+    print()
     file_path = "data/small_dataset.csv"
     entries = pd.read_csv(file_path)
     sequences = list(entries.sequence)
