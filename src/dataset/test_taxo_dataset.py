@@ -1,10 +1,5 @@
 import pytest
-import os
-
-from .taxo_dataset import *
-import logging
-
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
+from dataset.taxo_dataset import *
 
 # gunzip -c final_taxonomy.csv.gz > /tmp/final_taxonomy.csv
 TAXO_PATH = "/tmp/database.csv"
