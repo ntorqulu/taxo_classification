@@ -461,7 +461,7 @@ if __name__ == "__main__":
             remove_duplicates=True,
             filter_nonstandard_bases=True,
             enforce_taxonomy_consistency=True,
-            filter_gc_outliers=True
+            filter_gc_outliers=False
         )
         
         # Save the cleaned data
