@@ -21,7 +21,7 @@ class SequenceCoder:
 
     # the code for the kmer is based on a modification from https://github.com/MindAI/kmer/
 
-    def kmerize_one_seq(self, sequence, k, write_number_of_occurrences=True):
+    def kmerize_one_seq(self, sequence: str, k: int, write_number_of_occurrences: bool = True) -> np.ndarray:
         """
         Given a DNA sequence, return the 1-hot representation of its kmer feature.
 
