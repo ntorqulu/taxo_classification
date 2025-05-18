@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
 
 # gunzip -c final_taxonomy.csv.gz > /tmp/final_taxonomy.csv
-TAXO_PATH = "/tmp/final_taxonomy.csv"
+TAXO_PATH = "/tmp/database.csv"
 
 def max_dif(a: int, b: int, maxdif=1) -> bool:
     return abs(a - b) <= maxdif
