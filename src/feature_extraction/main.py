@@ -1,14 +1,10 @@
 import pandas as pd
 import numpy as np
 import torch
+
 class SequenceCoder:
-    def __init__(self):
-        """
-        sequences: list of dict
-        """
-        self.letters = ['A', 'T', 'C', 'G']
-        return None
-    
+    LETTERS = ('A', 'T', 'C', 'G')
+
     def load_sequences(self, file_path):
         """
         Load sequences from a CSV file.
@@ -54,7 +50,7 @@ class SequenceCoder:
         """
         digits = []
         for letter in kmer:
-            digits.append(self.letters.index(letter))
+            digits.append(SequenceCoder.LETTERS.index(letter))
 
         # digits = np.array(digits)
         digits = torch.tensor(digits)
