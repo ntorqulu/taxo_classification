@@ -150,6 +150,10 @@ class SequenceCoder:
         return bits_features
 
 
+def kmer_encoder(sequence: str, k: int) -> np.ndarray:
+    kmer = SequenceCoder().kmerize_one_seq(sequence, k)
+    return kmer
+
 
     
 if __name__ == "__main__":
