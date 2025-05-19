@@ -1,3 +1,4 @@
+# tensorflow-intel
 numpy
 pandas
 scikit-learn
@@ -10,3 +11,8 @@ pyarrow # dataset fast loads
 fastparquet # dataset fast loads
 biopython
 plotly
+# Uncomment the following lines for Intel XPU support
+#--index-url https://download.pytorch.org/whl/xpu
+#torch
+#torchvision
+#torchaudio
