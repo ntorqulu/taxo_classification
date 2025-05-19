@@ -122,11 +122,11 @@ class TaxoDataset(Dataset):
             info(f"Using cached contents of {TaxoDataset._cached_path }")
             return df
 
-        pickle_path = TaxoDataset.get_pickle_path(self.taxo_path)
+        parquet_path = TaxoDataset.get_parquet_path(self.taxo_path)
         t0 = time.time()
-        if self.use_cache and os.path.exists(pickle_path):
-            info(f"Loading {pickle_path}")
-            df = pd.read_pickle(pickle_path)
+        if self.use_cache and os.path.exists(parquet_path):
+            info(f"Loading {parquet_path}")
+            df = pd.read_parquet(parquet_path)
             save_parquet = False
         else:
             info(f"Loading {self.taxo_path} ")
@@ -148,8 +148,8 @@ class TaxoDataset(Dataset):
         info(f"Loaded {len(df):,} rows in {seconds:.1f} seconds ")
 
         if save_parquet:
-            info(f"Saving {pickle_path}")
-            df.to_pickle(pickle_path)
+            info(f"Saving {parquet_path}")
+            df.to_parquet(parquet_path)
             info(f"Saved")
         TaxoDataset._cached_df = df
         TaxoDataset._cached_path = self.taxo_path
@@ -321,8 +321,9 @@ class TaxoDataset(Dataset):
         return start_idx, end_idx
 
     @staticmethod
-    def get_pickle_path(csv_path: str):
+    def get_parquet_path(csv_path: str):
         if csv_path.lower().endswith(".csv"):
-            return csv_path[:-4] + ".pkl"
+            parquet_path = csv_path[:-len(".csv")] + ".parquet"
         else:
-            return csv_path + ".pkl"
+            parquet_path = csv_path + ".parquet"
+        return parquet_path
