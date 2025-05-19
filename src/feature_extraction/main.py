@@ -456,6 +456,10 @@ class SequenceCoder:
         else:
             raise ValueError(f"Unknown method: {method}")
 
+def kmer_encoder(sequence: str, k: int) -> np.ndarray:
+    kmer = SequenceCoder().kmerize_one_seq_optimized(sequence, k)
+    return kmer
+
 
 # Example usage
 if __name__ == "__main__":
