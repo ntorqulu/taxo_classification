@@ -1,14 +1,10 @@
 import pandas as pd
 import numpy as np
 import torch
+
 class SequenceCoder:
-    def __init__(self):
-        """
-        sequences: list of dict
-        """
-        self.letters = ['A', 'T', 'C', 'G']
-        return None
-    
+    LETTERS = ('A', 'T', 'C', 'G')
+
     def load_sequences(self, file_path):
         """
         Load sequences from a CSV file.
@@ -21,7 +17,7 @@ class SequenceCoder:
 
     # the code for the kmer is based on a modification from https://github.com/MindAI/kmer/
 
-    def kmerize_one_seq(self, sequence, k, write_number_of_occurrences=True):
+    def kmerize_one_seq(self, sequence: str, k: int, write_number_of_occurrences: bool = True) -> np.ndarray:
         """
         Given a DNA sequence, return the 1-hot representation of its kmer feature.
 
@@ -54,7 +50,7 @@ class SequenceCoder:
         """
         digits = []
         for letter in kmer:
-            digits.append(self.letters.index(letter))
+            digits.append(SequenceCoder.LETTERS.index(letter))
 
         # digits = np.array(digits)
         digits = torch.tensor(digits)
@@ -154,6 +150,10 @@ class SequenceCoder:
         return bits_features
 
 
+def kmer_encoder(sequence: str, k: int) -> np.ndarray:
+    kmer = SequenceCoder().kmerize_one_seq(sequence, k)
+    return kmer
+
 
     
 if __name__ == "__main__":
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     print(sequences.coding_one_hot_bit(bits=1))
 
     # externally loaded:
-    print
+    print()
     file_path = "data/small_dataset.csv"
     entries = pd.read_csv(file_path)
     sequences = list(entries.sequence)
