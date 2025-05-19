@@ -7,11 +7,12 @@ from collections import Counter
 import time
 
 class SequenceCoder:
+    LETTERS = ['A', 'T', 'C', 'G']
+
     def __init__(self):
         """
         Initialize the sequence coder with basic parameters.
         """
-        self.letters = ['A', 'T', 'C', 'G']
         self.sequences = None
         self.init_lookup_tables()
     
@@ -58,7 +59,7 @@ class SequenceCoder:
 
     # ===== K-MER ENCODING OPTIMIZATIONS =====
     
-    def kmerize_one_seq_optimized(self, sequence, k, write_number_of_occurrences=True):
+    def kmerize_one_seq_optimized(self, sequence: str, k: int, write_number_of_occurrences: bool=True):
         """
         Optimized version of k-mer counting for a single sequence.
         """
@@ -67,7 +68,7 @@ class SequenceCoder:
             return np.zeros(4**k)
             
         # Filter out non-standard nucleotides
-        valid_seq = ''.join(c for c in sequence if c in self.letters)
+        valid_seq = ''.join(c for c in sequence if c in SequeceCoder.LETTERS)
         
         # Early return if sequence is too short after filtering
         if len(valid_seq) < k:
@@ -85,7 +86,7 @@ class SequenceCoder:
             if len(kmer) == k:  # Make sure it's a complete k-mer
                 try:
                     # Convert bases to indices
-                    digits = np.array([self.letters.index(letter) for letter in kmer])
+                    digits = np.array([SequenceCoder.LETTERS.index(letter) for letter in kmer])
                     # Calculate k-mer index
                     index = int((digits * multiply_by).sum())
                     indices.append(index)
@@ -112,8 +113,8 @@ class SequenceCoder:
         try:
             digits = []
             for letter in kmer:
-                if letter in self.letters:
-                    digits.append(self.letters.index(letter))
+                if letter in SequenceCoder.LETTERS:
+                    digits.append(SequenceCoder.LETTERS.index(letter))
                 else:
                     # Skip invalid bases
                     return -1
