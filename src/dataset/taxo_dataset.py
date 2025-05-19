@@ -46,10 +46,13 @@ class TaxoDataset(Dataset):
             return False
         return True
 
+    KMER_COLUMN_NAME = 'kmer'
+    KMER_K = 3
+
     def __init__(self,
                  taxo_path: str,
-                 # TODO: sequence_encoder: BaseSequenceEncoder,
                  split: Literal['all', 'train', 'eval', 'test'],
+                 sequence_encoder: Callable[[str, int], np.ndarray],
                  max_rows: int | float = 1.,
                  ranks: dict[str, str] = None,
                  sequence_column_name: str = "sequence",
@@ -90,6 +93,7 @@ class TaxoDataset(Dataset):
             raise ValueError(f"Unrecognized ranks keys: {ranks.keys()}")
 
         self.taxo_path = taxo_path
+        self.sequence_encoder = sequence_encoder
         self.ranks = ranks
         self.sequence_column_name = sequence_column_name
         self.label_column_name = TaxoDataset.RANKS_COLUMN_NAMES[0] # TODO:
@@ -105,7 +109,6 @@ class TaxoDataset(Dataset):
         else:
             self.row_indexes = self._init_row_indexes()
             self.start_index, self.end_index = None, None
-        # TODO: self.sequence_encoder = sequence_encoder
 
     def _init_df(self) -> pd.DataFrame:
         if self.use_cache and TaxoDataset._is_df_cached(self.taxo_path):
@@ -127,6 +130,12 @@ class TaxoDataset(Dataset):
                 low_memory=False,
                 usecols = [self.sequence_column_name] + TaxoDataset.RANKS_COLUMN_NAMES
             ) # low_memory=False to avoid warning about mixed types
+            info(f"Loaded {self.taxo_path} ")
+            info(f"Encoding")
+            df[TaxoDataset.KMER_COLUMN_NAME] = df[self.sequence_column_name].apply(
+                lambda seq: self.sequence_encoder(seq, 3)
+            )
+            info(f"Encoding finished")
             save_parquet = self.use_cache
 
         seconds = time.time() - t0
@@ -190,6 +199,7 @@ class TaxoDataset(Dataset):
             subset type.
         """
         return TaxoDataset(taxo_path=self.taxo_path,
+                           sequence_encoder=self.sequence_encoder,
                            sequence_column_name=self.sequence_column_name,
                            ranks=self.ranks,
                            split=split,
@@ -301,10 +311,3 @@ class TaxoDataset(Dataset):
             return csv_path[:-4] + ".pkl"
         else:
             return csv_path + ".pkl"
-
-def __create_pickle_file(taxo_path: str,):
-    TaxoDataset(taxo_path=taxo_path, split='all')
-    print(TaxoDataset(taxo_path=taxo_path, split='all').df_memory_usage_mb, "MB")
-
-if __name__ == "__main__":
-    __create_pickle_file('/tmp/final_taxonomy.csv')
