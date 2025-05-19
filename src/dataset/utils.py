@@ -10,3 +10,4 @@ def warn(s: str):
 
 def error(s: str):
     logging.error(s)
+
