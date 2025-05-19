@@ -1,13 +1,10 @@
 import pytest
 import os
-
-from .taxo_dataset import *
-import logging
-
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
+from dataset.taxo_dataset import TaxoDataset
+from feature_extraction.main import kmer_encoder
 
 # gunzip -c final_taxonomy.csv.gz > /tmp/final_taxonomy.csv
-TAXO_PATH = "/tmp/final_taxonomy.csv"
+TAXO_PATH = "/tmp/database.csv"
 
 def max_dif(a: int, b: int, maxdif=1) -> bool:
     return abs(a - b) <= maxdif
@@ -19,12 +16,13 @@ def num_rows_taxopath():
 
 def test_cache():
     # WARNING! It has to be the first test
-    assert os.path.exists(TAXO_PATH)
     pikle_path = TaxoDataset.get_pickle_path(TAXO_PATH)
     if os.path.exists(pikle_path):
-        os.remove(pikle_path)
+        print(f"To test the cache, please delete the {pikle_path} file manually."
+              "Please note that it will take more than an hour.")
+        input("Press ENTER to continue...")
     assert TaxoDataset._cached_df is None
-    TaxoDataset(TAXO_PATH, split='all')
+    TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all')
     assert TaxoDataset._cached_df is not None
     assert os.path.exists(pikle_path)
 
@@ -51,7 +49,7 @@ def test_len():
         else:
             num_rows = max_rows
 
-        all_dataset = TaxoDataset(TAXO_PATH, split='all', max_rows=max_rows)
+        all_dataset = TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', max_rows=max_rows)
         assert max_dif(len(all_dataset), num_rows,1), f"all: {max_rows=}"
 
         train_dataset = all_dataset.new_split('train')
@@ -72,28 +70,29 @@ def test_len():
 
 def test_class_instance_errors():
     with pytest.raises(FileNotFoundError):
-        TaxoDataset('/tmp/does_not_exist_dont_worry_its_a_test', split='all')
+        TaxoDataset('/tmp/does_not_exist_dont_worry_its_a_test',
+                    sequence_encoder=kmer_encoder, split='all')
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split=None)
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split=None)
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='invented_split')
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='invented_split')
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='all', max_rows=-1)
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', max_rows=-1)
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='all', max_rows=0)
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', max_rows=0)
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='all', max_rows=0.)
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', max_rows=0.)
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='all', max_rows=5.)
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', max_rows=5.)
 
     with pytest.raises(ValueError):
-        TaxoDataset(TAXO_PATH, split='all', ranks={'INVENTED_COLUMN':'a'})
+        TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all', ranks={'INVENTED_COLUMN':'a'})
 
 def test_index_access():
     def test_limits(taxodataset: TaxoDataset):
@@ -101,7 +100,7 @@ def test_index_access():
         with pytest.raises(IndexError):
             assert taxodataset[len(taxodataset)]
 
-    all_dataset = TaxoDataset(TAXO_PATH, split='all')
+    all_dataset = TaxoDataset(TAXO_PATH, sequence_encoder=kmer_encoder, split='all')
 
     with pytest.raises(IndexError):
         assert all_dataset[-1]

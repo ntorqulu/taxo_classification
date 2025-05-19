@@ -3,11 +3,10 @@ import random
 import time
 import torch
 import pandas as pd
-from torch import Tensor
+import numpy as np
 from typing import Callable, Literal
 from torch.utils.data import Dataset
-from sklearn.preprocessing import OneHotEncoder
-from .util import info, warn
+from dataset.utils import info, warn
 
 class TaxoDataset(Dataset):
     RANKS_COLUMN_NAMES: list[str] = [
@@ -46,10 +45,14 @@ class TaxoDataset(Dataset):
             return False
         return True
 
+    KMER_COLUMN_NAME = 'kmer'
+    LABEL_ID_COLUMN_NAME = 'label_id'
+    KMER_K = 3
+
     def __init__(self,
                  taxo_path: str,
-                 # TODO: sequence_encoder: BaseSequenceEncoder,
                  split: Literal['all', 'train', 'eval', 'test'],
+                 sequence_encoder: Callable[[str, int], np.ndarray],
                  max_rows: int | float = 1.,
                  ranks: dict[str, str] = None,
                  sequence_column_name: str = "sequence",
@@ -58,7 +61,8 @@ class TaxoDataset(Dataset):
                  ):
         """
         taxo_path: Path to a CSV file with the taxonomy. It has to have the a sequence_column_name column and a "label"
-                   column. Optionally, it can have other columns with the taxonomic ranks (depending on the ranks argument).
+                   column. Optionally, it can have other columns with the taxonomic ranks (depending on the ranks
+                   argument).
         split: Split to load. It can be "all", "train", "eval" or "test".
         max_rows: Maximum number of rows to load. If the value is int, it is used as the number of rows to load. If the
                   number is float, it is used as a percentage of the total number of rows. Default is 1. as 100%
@@ -90,14 +94,20 @@ class TaxoDataset(Dataset):
             raise ValueError(f"Unrecognized ranks keys: {ranks.keys()}")
 
         self.taxo_path = taxo_path
+        self.sequence_encoder = sequence_encoder
         self.ranks = ranks
         self.sequence_column_name = sequence_column_name
-        self.label_column_name = TaxoDataset.RANKS_COLUMN_NAMES[0] # TODO:
+        self.label_column_name = TaxoDataset.RANKS_COLUMN_NAMES[3] # TODO:
         self.use_cache = use_cache
         self.random_seed = random_seed
         self.split = split
         self.df: pd.DataFrame = self._init_df()
-        info(self.df.columns)
+        self.labels_ids = self._init_labels_ids()
+
+        kmer_lengths = self.df[TaxoDataset.KMER_COLUMN_NAME].apply(len)
+        self.data_length = kmer_lengths.max()
+        info(f"kmer lengths between {kmer_lengths.min()} and {kmer_lengths.max()}")
+
         self.max_rows: int = self._init_max_rows(max_rows)
         if self.max_rows == len(self.df):
             self.row_indexes = []
@@ -105,7 +115,6 @@ class TaxoDataset(Dataset):
         else:
             self.row_indexes = self._init_row_indexes()
             self.start_index, self.end_index = None, None
-        # TODO: self.sequence_encoder = sequence_encoder
 
     def _init_df(self) -> pd.DataFrame:
         if self.use_cache and TaxoDataset._is_df_cached(self.taxo_path):
@@ -127,10 +136,17 @@ class TaxoDataset(Dataset):
                 low_memory=False,
                 usecols = [self.sequence_column_name] + TaxoDataset.RANKS_COLUMN_NAMES
             ) # low_memory=False to avoid warning about mixed types
+            info(f"Loaded {self.taxo_path} ")
+            info(f"Encoding")
+            df[TaxoDataset.KMER_COLUMN_NAME] = df[self.sequence_column_name].apply(
+                lambda seq: self.sequence_encoder(seq, 3)
+            )
+            info(f"Encoding finished")
             save_parquet = self.use_cache
 
         seconds = time.time() - t0
         info(f"Loaded {len(df):,} rows in {seconds:.1f} seconds ")
+
         if save_parquet:
             info(f"Saving {pickle_path}")
             df.to_pickle(pickle_path)
@@ -140,6 +156,13 @@ class TaxoDataset(Dataset):
         TaxoDataset._cached_file_size = os.path.getsize(self.taxo_path)
 
         return df
+
+    def _init_labels_ids(self) -> dict[str, int]:
+        # TODO: Calculate depending on the filters
+        label_values: list[str] = self.df[self.label_column_name].unique().tolist()
+        label_idx_value = {l[1] : l[0] for l in enumerate(label_values)}
+        info(f"There is {len(label_idx_value)} labels available.")
+        return label_idx_value
 
     def _init_max_rows(self, max_rows: int | float) -> int:
         if isinstance(max_rows, float):
@@ -167,6 +190,11 @@ class TaxoDataset(Dataset):
             TaxoDataset._cached_memory_usage = self.df.memory_usage(deep=True).sum() / (1024 ** 2)
         return TaxoDataset._cached_memory_usage
 
+    @property
+    def num_labels(self):
+        #TODO: filters
+        return len(self.labels_ids)
+
     def new_split(self, split: Literal['all', 'train', 'eval', 'test']) -> 'TaxoDataset':
         """
         Splits the dataset based on the specified subset type.
@@ -190,6 +218,7 @@ class TaxoDataset(Dataset):
             subset type.
         """
         return TaxoDataset(taxo_path=self.taxo_path,
+                           sequence_encoder=self.sequence_encoder,
                            sequence_column_name=self.sequence_column_name,
                            ranks=self.ranks,
                            split=split,
@@ -204,7 +233,7 @@ class TaxoDataset(Dataset):
             l = self.end_index - self.start_index + 1
         return l
 
-    def __getitem__(self, idx: int) -> tuple[Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         if idx < 0:
             raise IndexError(f"Index {idx} is negative")
         if idx >= len(self):
@@ -216,14 +245,10 @@ class TaxoDataset(Dataset):
             idx = self.start_index + idx
         row = self.df.iloc[idx]
         label = row[self.label_column_name]
-        sequence = row[self.sequence_column_name]
-
-        # TODO: use encoder provided
-        # encoder = OneHotEncoder(sparse_output=False)
-        # onehot_sequences = encoder.fit_transform(sequence)
-
-        #tensor = torch.from_numpy(torch.ra.to_numpy())
-        tensor = torch.torch.rand(3, 4)
+        label = [self.labels_ids[label]]
+        label = torch.tensor(label, dtype=torch.long).view(-1)
+        kmer = row[TaxoDataset.KMER_COLUMN_NAME]
+        tensor = torch.tensor(kmer, dtype=torch.float32)
         return tensor, label
 
     @staticmethod
@@ -301,10 +326,3 @@ class TaxoDataset(Dataset):
             return csv_path[:-4] + ".pkl"
         else:
             return csv_path + ".pkl"
-
-def __create_pickle_file(taxo_path: str,):
-    TaxoDataset(taxo_path=taxo_path, split='all')
-    print(TaxoDataset(taxo_path=taxo_path, split='all').df_memory_usage_mb, "MB")
-
-if __name__ == "__main__":
-    __create_pickle_file('/tmp/final_taxonomy.csv')

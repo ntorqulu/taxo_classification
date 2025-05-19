@@ -1,54 +1,50 @@
 import torch
-from torch.utils.data import DataLoader
-from taxo_dataset import TaxoDataset
+import numpy as np
+from typing import Callable
+from dataset.taxo_dataset import TaxoDataset
 
-def taxo_data_loaders(taxo_path: str,
-                      batch_size: int,
-                      max_rows: int | float = 1.) -> tuple[DataLoader, DataLoader, DataLoader]:
-    """
-    Get DataLoaders for training, evaluation, and testing datasets.
 
-    This function creates and returns three PyTorch DataLoaders corresponding to training,
-    evaluation, and testing datasets. Datasets are loaded from a specified taxonomy file
-    using the TaxoDataset class. DataLoaders are configured with the given batch size and
-    no shuffling to optimize performance. The returned DataLoaders enable efficient
-    mini-batch data handling for model training, validation, and testing.
+class TaxoDataLoaders:
 
-    Parameters
-    ----------
-    taxo_path : str
-        The file path to the taxonomy dataset, which contains data for all splits
-        (train, eval, test).
-    batch_size : int
-        The number of data samples to be included in each batch.
-    max_rows : int | float, optional
-        The maximum number of rows to load from the dataset. See TaxoDataSet docstring
+    def __init__(self,
+                 taxo_path: str,
+                 sequence_encoder: Callable[[str, int], np.ndarray],
+                 batch_size: int,
+                 max_rows: int | float = 1.,
+                 ):
+        self.all_dataset = TaxoDataset(
+            taxo_path=taxo_path,
+            split='all',
+            sequence_encoder=sequence_encoder,
+            max_rows=max_rows,
+        )
 
-    Returns
-    -------
-    tuple of DataLoader
-        A tuple containing three DataLoaders for training, evaluation, and testing datasets.
-    """
-    train_dataset = TaxoDataset(taxo_path=taxo_path, split='train', max_rows=max_rows)
-    eval_dataset = train_dataset.new_split('eval')
-    test_dataset = train_dataset.new_split('test')
+        train_dataset = self.all_dataset.new_split('all')
+        eval_dataset = self.all_dataset.new_split('eval')
+        test_dataset = self.all_dataset.new_split('test')
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=batch_size,
-        shuffle=False, # We do the suffle on the DataLoader to increase performance
-    )
+        self.train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset,
+            batch_size=batch_size,
+            shuffle=False, # We do the suffle on the DataLoader to increase performance
+        )
 
-    eval_loader = torch.utils.data.DataLoader(
-        dataset=eval_dataset,
-        batch_size=batch_size,
-        shuffle=False, # We do the suffle on the DataLoader to increase performance
-    )
+        self.eval_loader = torch.utils.data.DataLoader(
+            dataset=eval_dataset,
+            batch_size=batch_size,
+            shuffle=False, # We do the suffle on the DataLoader to increase performance
+        )
 
-    test_loader = torch.utils.data.DataLoader(
-        dataset=test_dataset,
-        batch_size=batch_size,
-        shuffle=False, # We do the suffle on the DataLoader to increase performance
-    )
+        self.test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset,
+            batch_size=batch_size,
+            shuffle=False, # We do the suffle on the DataLoader to increase performance
+        )
 
-    return train_loader, eval_loader, test_loader
+    @property
+    def num_labels(self) -> int:
+        return self.all_dataset.num_labels
+
+    @property
+    def data_length(self) -> int:
+        return self.all_dataset.data_length

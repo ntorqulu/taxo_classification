@@ -5,4 +5,8 @@ matplotlib
 seaborn
 torch
 tqdm
+pytest
+pyarrow # dataset fast loads
+fastparquet # dataset fast loads
 biopython
+plotly
