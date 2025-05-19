@@ -10,12 +10,12 @@ from feature_extraction.main import kmer_encoder
 
 HPARAMS = dict(
     taxo_path='/tmp/database.csv',
-    max_rows=1000,
+    max_rows=100000,
     seed=123,
-    kmer_k=2,
-    epochs=2,
+    # kmer_k=2
+    epochs=20,
     batch_size=32,
-    learning_rate=0.01,
+    learning_rate=0.001,
     sequence_encoder=kmer_encoder,
     # input_size= Assigned depending on the dataset,
     hidden_size=None,
@@ -38,6 +38,7 @@ def init_device() -> torch.device:
         return  torch.device("cpu")
 
 device: torch.device = init_device()
+info(f"Using torch device: {device}")
 
 def train_epoch(results: Results,
                 network: nn.Module,
@@ -86,18 +87,20 @@ def train(hparams: dict) -> (Results, Results, Results):
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(network.parameters(), lr=hparams['learning_rate']) #, weight_decay=hparams.weight_decay)
     #optimizer = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
-    # TODO: Scheduller
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5)
 
     train_results = Results(epochs=hparams['epochs'], name="Train")
     eval_results = Results(epochs=hparams['epochs'], name="Eval")
     test_results = Results(epochs=hparams['epochs'], name="Test")
     for epoch in range(hparams['epochs']):
+        info(f"--- Epoch {epoch} ---")
         train_epoch(results=train_results, network=network, data_loader=taxo_data_loaders.train_loader,
                     criterion=criterion, optimizer=optimizer)
         eval_epoch(results=eval_results, network=network, data_loader=taxo_data_loaders.eval_loader,
                    criterion=criterion)
         eval_epoch(results=test_results, network=network, data_loader=taxo_data_loaders.train_loader,
                    criterion=criterion)
+        # scheduler.step(eval_results.losses[-1])
     train_results.finish()
     eval_results.finish()
     # eval_epoch(results=test_results, network=network, data_loader=test_loader, criterion=criterion)
