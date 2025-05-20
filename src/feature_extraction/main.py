@@ -58,7 +58,7 @@ class SequenceCoder:
 
     # ===== K-MER ENCODING OPTIMIZATIONS =====
     
-    def kmerize_one_seq_optimized(self, sequence: str, k: int, write_number_of_occurrences: bool=True):
+    def kmerize_one_seq_optimized(self, sequence: str, k: int, write_number_of_occurrences: bool=True) -> np.ndarray:
         """
         Optimized version of k-mer counting for a single sequence.
         """
