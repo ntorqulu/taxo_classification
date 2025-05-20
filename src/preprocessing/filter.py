@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
 import logging
+from formatter import SequenceFormatter
+from cleaner import TaxonomyDataCleaner
 
 
 # Constants
@@ -87,288 +89,167 @@ class TaxonomyDataFilter:
         
         return cleaned_df
     
-    def filter_small_classes(self, df: pd.DataFrame, min_count: int = 5, target_column: str = "genus_name") -> pd.DataFrame:
+    def create_hierarchical_dataset(self,
+                               input_file=None,
+                               formatted_df=None,
+                               raw_data_params=None,
+                               cleaning_params=None,
+                               max_seq_length=320,
+                               output_file="data/database.csv") -> pd.DataFrame:
         """
-        Filter records belonging to classes with too few examples.
+        Create a hierarchical dataset for taxonomic classification with 4 nested levels.
+        
+        This function performs the complete pipeline:
+        1. Format raw data (optional)
+        2. Clean the formatted data
+        3. Filter by sequence length
+        4. Create hierarchical classification levels
         
         Parameters:
         -----------
-        df : pandas.DataFrame
-            DataFrame with taxonomic information
-        min_count : int
-            Minimum number of examples per class to keep
-        target_column : str
-            Column to use for class counting
-            
-        Returns:
-        --------
-        pandas.DataFrame
-            DataFrame with classes having sufficient examples
-        """
-        self.logger.info(f"Filtering classes with fewer than {min_count} examples in {target_column}")
-        
-        # Count occurrences of each class
-        class_counts = df[target_column].value_counts()
-        
-        # Identify classes with enough examples
-        valid_classes = class_counts[class_counts >= min_count].index
-        
-        # Filter the dataframe
-        filtered_df = df[df[target_column].isin(valid_classes)].copy()
-        
-        self.logger.info(f"Kept {len(filtered_df)} of {len(df)} records after filtering small classes")
-        self.logger.info(f"Remaining classes: {len(valid_classes)} of {len(class_counts)}")
-        
-        return filtered_df
-    
-    def filter_by_taxonomy(self, 
-                          df: pd.DataFrame, 
-                          taxonomic_filters: Dict[str, List[str]],
-                          exclude: bool = False) -> pd.DataFrame:
-        """
-        Filter data based on taxonomic criteria.
-        
-        Parameters:
-        -----------
-        df : pandas.DataFrame
-            DataFrame with taxonomic data
-        taxonomic_filters : Dict[str, List[str]]
-            Dictionary mapping taxonomic ranks to lists of allowed values
-            Example: {'phylum_name': ['Chordata'], 'class_name': ['Mammalia', 'Aves']}
-        exclude : bool
-            If True, exclude the specified taxa instead of including them
-            
-        Returns:
-        --------
-        pandas.DataFrame
-            Filtered DataFrame
-        """
-        self.logger.info(f"Filtering by taxonomy: {'excluding' if exclude else 'including'} specified taxa")
-        
-        # Make a copy to avoid modifying the original
-        filtered_df = df.copy()
-        
-        # Initial mask - keep all records if including, none if excluding
-        mask = pd.Series(not exclude, index=filtered_df.index)
-        
-        # Apply each taxonomic filter
-        for rank, values in taxonomic_filters.items():
-            if rank not in filtered_df.columns:
-                self.logger.warning(f"Column {rank} not found in dataframe, skipping this filter")
-                continue
-                
-            # Create mask for this rank
-            if exclude:
-                # Exclude the specified values
-                rank_mask = ~filtered_df[rank].isin(values)
-            else:
-                # Include only the specified values
-                rank_mask = filtered_df[rank].isin(values)
-            
-            # Combine with the overall mask using AND
-            mask = mask & rank_mask
-        
-        # Apply the final mask
-        result_df = filtered_df[mask].copy()
-        
-        self.logger.info(f"Kept {len(result_df)} of {len(df)} records after taxonomic filtering")
-        
-        return result_df
-    
-
-    def balance_class_representation(self,
-                                df: pd.DataFrame,
-                                target_column: str = 'genus_name',
-                                min_examples: int = 5,
-                                max_examples: Optional[int] = None,
-                                sampling_strategy: str = 'random',
-                                random_state: int = 42) -> pd.DataFrame:
-        """
-        Balance dataset by removing underrepresented classes and limiting overrepresented ones.
-        
-        Parameters:
-        -----------
-        df : pandas.DataFrame
-            DataFrame with taxonomic data
-        target_column : str
-            Column containing class information to balance
-        min_examples : int
-            Minimum number of examples required for each class (removes classes with fewer)
-        max_examples : int, optional
-            Maximum number of examples to keep for each class (samples if more)
-        sampling_strategy : str
-            Strategy for sampling overrepresented classes: 'random', 'first', or 'diverse'
-        random_state : int
-            Random seed for reproducible sampling
-            
-        Returns:
-        --------
-        pandas.DataFrame
-            Balanced DataFrame
-        """
-        self.logger.info(f"Balancing class representation for {target_column}")
-        
-        if target_column not in df.columns:
-            self.logger.error(f"Target column {target_column} not found in dataframe")
-            return df
-        
-        # Make a copy to avoid modifying the original
-        balanced_df = df.copy()
-        
-        # Count examples per class
-        class_counts = balanced_df[target_column].value_counts()
-        total_classes = len(class_counts)
-        
-        # 1. Remove underrepresented classes
-        if min_examples > 1:
-            underrepresented = class_counts[class_counts < min_examples].index
-            if len(underrepresented) > 0:
-                balanced_df = balanced_df[~balanced_df[target_column].isin(underrepresented)].copy()
-                self.logger.info(f"Removed {len(underrepresented)} underrepresented classes with fewer than {min_examples} examples")
-        
-        # 2. Limit overrepresented classes
-        if max_examples is not None and max_examples > 0:
-            overrepresented = class_counts[class_counts > max_examples].index
-            
-            if len(overrepresented) > 0:
-                # Initialize a list to collect the balanced samples
-                balanced_samples = []
-                
-                # First add all classes that aren't overrepresented
-                balanced_samples.append(
-                    balanced_df[~balanced_df[target_column].isin(overrepresented)]
-                )
-                
-                # Then sample from each overrepresented class
-                for cls in overrepresented:
-                    class_df = balanced_df[balanced_df[target_column] == cls]
-                    
-                    if sampling_strategy == 'first':
-                        # Take the first max_examples
-                        sampled = class_df.iloc[:max_examples]
-                    elif sampling_strategy == 'diverse':
-                        # Try to get a diverse sample - we'll use sequence length as a diversity metric
-                        # Sort by sequence length and take evenly spaced samples
-                        if 'sequence' in class_df.columns:
-                            class_df['seq_len'] = class_df['sequence'].str.len()
-                            class_df = class_df.sort_values('seq_len')
-                            indices = np.linspace(0, len(class_df) - 1, max_examples).astype(int)
-                            sampled = class_df.iloc[indices].drop('seq_len', axis=1)
-                        else:
-                            # Fall back to random if sequence column not available
-                            sampled = class_df.sample(max_examples, random_state=random_state)
-                    else:
-                        # Default to random sampling
-                        sampled = class_df.sample(max_examples, random_state=random_state)
-                    
-                    balanced_samples.append(sampled)
-                
-                # Combine all balanced samples
-                balanced_df = pd.concat(balanced_samples, ignore_index=False)
-                
-                self.logger.info(f"Limited {len(overrepresented)} overrepresented classes to a maximum of {max_examples} examples")
-        
-        # Calculate final statistics
-        final_class_counts = balanced_df[target_column].value_counts()
-        final_classes = len(final_class_counts)
-        
-        self.logger.info(f"Class balance result: {final_classes} classes (from {total_classes}) with "
-                    f"{len(balanced_df)} examples (min: {final_class_counts.min()}, max: {final_class_counts.max()}, "
-                    f"avg: {final_class_counts.mean():.1f})")
-        
-        return balanced_df
-
-    def filter_for_balanced_training(self,
-                                    input_file: str,
-                                    target_rank: str = 'genus',
-                                    min_examples: int = 5,
-                                    max_examples: Optional[int] = None,
-                                    filter_approximated: bool = False,
-                                    taxonomic_scope: Optional[Dict[str, List[str]]] = None,
-                                    balance_sampling_strategy: str = 'random',
-                                    output_file: Optional[str] = None) -> pd.DataFrame:
-        """
-        Filter and balance data for training, removing underrepresented classes and capping overrepresented ones.
-        
-        Parameters:
-        -----------
-        input_file : str
-            Path to input CSV file with taxonomic data
-        target_rank : str
-            Taxonomic rank to balance (e.g., 'genus', 'family')
-        min_examples : int
-            Minimum examples required per class
-        max_examples : int, optional
-            Maximum examples to keep per class
-        filter_approximated : bool
-            Whether to remove records with approximated names
-        taxonomic_scope : Dict[str, List[str]], optional
-            Optional filtering to specific taxa before balancing
-        balance_sampling_strategy : str
-            Strategy for sampling: 'random', 'first', or 'diverse'
+        input_file : str, optional
+            Path to formatted CSV file. If None, formatted_df or raw_data_params must be provided.
+        formatted_df : pd.DataFrame, optional
+            Already formatted dataframe to use instead of loading from file
+        raw_data_params : dict, optional
+            Parameters for formatting raw data. Should include:
+            - perl_script_path: Path to select_region.pl script
+            - input_tsv: Path to input TSV file
+            - names_dmp: Path to NCBI names.dmp
+            - nodes_dmp: Path to NCBI nodes.dmp
+        cleaning_params : dict, optional
+            Parameters for cleaning data. Default parameters will be used if not provided.
+        max_seq_length : int, optional
+            Maximum sequence length to include (default: 320)
         output_file : str, optional
-            Path for saving the balanced data
+            Path to save the final dataset (default: "data/database.csv")
             
         Returns:
         --------
-        pandas.DataFrame
-            Filtered and balanced DataFrame
+        pd.DataFrame
+            The processed hierarchical dataset
         """
-        self.logger.info(f"Preparing balanced training data for {target_rank} prediction")
+
+        self.logger.info("Starting hierarchical dataset creation pipeline")
+        # Step 1: Format raw data if needed
+        if formatted_df is None:
+            if input_file:
+                self.logger.info(f"Loading formatted data from {input_file}")
+                formatted_df = pd.read_csv(input_file, dtype=str)
+            elif raw_data_params:
+                self.logger.info("Formatting raw data")
+                formatter = SequenceFormatter()
+                
+                formatted_df = formatter.format_data(
+                    run_coi_selection=True,
+                    perl_script_path=raw_data_params.get('perl_script_path'),
+                    input_tsv=raw_data_params.get('input_tsv'),
+                    names_dmp=raw_data_params.get('names_dmp'),
+                    nodes_dmp=raw_data_params.get('nodes_dmp')
+                )
+                # Save intermediary result
+                formatted_df.to_csv("data/processed/formatted_sequences.csv", index=False)
+            else:
+                raise ValueError("Either input_file, formatted_df, or raw_data_params must be provided")
+                
+        # Step 2: Clean the formatted data
+        self.logger.info("Cleaning the formatted data")
+        cleaner = TaxonomyDataCleaner()
         
-        # Ensure target_rank has proper format
-        if not target_rank.endswith('_name'):
-            target_column = f"{target_rank}_name"
-        else:
-            target_column = target_rank
-            target_rank = target_rank.replace('_name', '')
+        clean_params = {
+            'min_seq_length': 299,
+            'max_n_percent': 0.0,
+            'require_complete_ranks_up_to': "species",
+            'remove_duplicates': True,
+            'filter_nonstandard_bases': True,
+            'enforce_taxonomy_consistency': True,
+            'filter_gc_outliers': False
+        }
         
-        # Load the data
-        try:
-            df = pd.read_csv(input_file)
-            self.logger.info(f"Loaded {len(df)} records from {input_file}")
-        except Exception as e:
-            self.logger.error(f"Error loading data: {e}")
-            raise
+        # Override default cleaning parameters if provided
+        if cleaning_params:
+            clean_params.update(cleaning_params)
         
-        # Step 1: Handle approximated names if requested
-        if filter_approximated:
-            df = self.clean_approximated_names(df, remove_approximated=True)
+        cleaned_df = cleaner.clean_data(formatted_df, **clean_params)
         
-        # Step 2: Apply taxonomic scope filtering if provided
-        if taxonomic_scope:
-            df = self.filter_by_taxonomy(df, taxonomic_scope)
+        # Save cleaned data
+        output_clean = cleaner.save_cleaned_data(cleaned_df)
+        self.logger.info(f"Saved cleaned data to {output_clean}")
         
-        # Step 3: Balance class representation
-        balanced_df = self.balance_class_representation(
-            df,
-            target_column=target_column,
-            min_examples=min_examples,
-            max_examples=max_examples,
-            sampling_strategy=balance_sampling_strategy
-        )
+        # Load the clean data to ensure we're using the saved version
+        data = pd.read_csv(output_clean, dtype=str)
         
-        # Step 4: Save to file if requested
-        if output_file:
-            balanced_df.to_csv(output_file, index=False)
-            self.logger.info(f"Saved balanced data to {output_file}")
-        else:
-            # Generate default output filename
-            default_output = os.path.join(
-                self.filtered_data_dir, 
-                f"{target_rank}_balanced_min{min_examples}" + 
-                (f"_max{max_examples}" if max_examples else "") + 
-                ".csv"
-            )
-            balanced_df.to_csv(default_output, index=False)
-            self.logger.info(f"Saved balanced data to {default_output}")
+        # clean the approximated names
+        self.logger.info("Cleaning approximated names")
+        data = self.clean_approximated_names(data, remove_approximated=False)
+        self.logger.info(f"After cleaning: {len(data)} sequences")
         
-        # Print summary
-        class_counts = balanced_df[target_column].value_counts()
-        self.logger.info(f"Final balanced dataset: {len(balanced_df)} records across {len(class_counts)} classes")
-        self.logger.info(f"Class sizes - Min: {class_counts.min()}, Max: {class_counts.max()}, Mean: {class_counts.mean():.1f}")
+        # Step 3: Filter by max sequence length
+        self.logger.info(f"Filtering sequences by max length: {max_seq_length}")
+        data = data[data['sequence'].str.len() <= max_seq_length]
+        self.logger.info(f"After length filtering: {len(data)} sequences")
         
-        return balanced_df
+        # Step 4: Create hierarchical levels
+        self.logger.info("Creating hierarchical classification levels")
+        
+        # Level 1: Kingdom-based categories
+        level_1 = ['Metazoa', 'Viridiplantae', 'Fungi', 'Other_euk', 'No_euk']
+        data['level_1'] = data['kingdom_name']
+        data.loc[data['kingdom_name'].str.contains('Bacteria', na=False), 'level_1'] = 'No_euk'
+        data.loc[~data['level_1'].isin(level_1), 'level_1'] = 'Other_euk'
+        
+        # Level 2: Phylum-based categories for Metazoa
+        level_2 = ['Arthropoda', 'Chordata', 'Mollusca', 'Annelida', 'Echinodermata', 
+                'Platyhelminthes', 'Cnidaria', 'Other_metazoa', 'No_metazoa']
+        data['level_2'] = data['phylum_name']
+        data.loc[~data['level_1'].str.contains('Metazoa', na=False), 'level_2'] = 'No_metazoa'
+        data.loc[~data['level_2'].isin(level_2), 'level_2'] = 'Other_metazoa'
+        
+        # Level 3: Class-based categories for Arthropoda
+        level_3 = ['Insecta', 'Arachnida', 'Malacostraca', 'Collembola', 'Hexanauplia', 
+                'Thecostraca', 'Branchiopoda', 'Diplopoda', 'Ostracoda', 'Chilopoda', 
+                'Pycnogonida', 'Other_arthropoda', 'No_arthropoda']
+        data['level_3'] = data['class_name']
+        data.loc[~data['level_2'].str.contains('Arthropoda', na=False), 'level_3'] = 'No_arthropoda'
+        data.loc[~data['level_3'].isin(level_3), 'level_3'] = 'Other_arthropoda'
+        
+        # Level 4: Order-based categories for Insecta
+        level_4 = ['Diptera', 'Lepidoptera', 'Hymenoptera', 'Coleoptera', 'Hemiptera', 
+                'Trichoptera', 'Orthoptera', 'Ephemeroptera', 'Odonata', 'Blattodea', 
+                'Thysanoptera', 'Psocoptera', 'Plecoptera', 'Neuroptera',
+                'Other_insecta', 'No_insecta']
+        data['level_4'] = data['order_name']
+        data.loc[~data['level_3'].str.contains('Insecta', na=False), 'level_4'] = 'No_insecta'
+        data.loc[~data['level_4'].isin(level_4), 'level_4'] = 'Other_insecta'
+        
+        # Save the final dataset
+        data.to_csv(output_file, index=False)
+        self.logger.info(f"Saved hierarchical dataset to {output_file}")
+        
+        # Print summary statistics
+        self.logger.info(f"Final dataset summary:")
+        self.logger.info(f"  Total sequences: {len(data)}")
+        self.logger.info(f"  Level 1 categories: {data['level_1'].nunique()} ({data['level_1'].value_counts().to_dict()})")
+        self.logger.info(f"  Level 2 categories: {data['level_2'].nunique()} (top 5: {data['level_2'].value_counts().head().to_dict()})")
+        self.logger.info(f"  Level 3 categories: {data['level_3'].nunique()} (top 5: {data['level_3'].value_counts().head().to_dict()})")
+        self.logger.info(f"  Level 4 categories: {data['level_4'].nunique()} (top 5: {data['level_4'].value_counts().head().to_dict()})")
+        
+        # delete columns superkingdom_name, kingdom_name, phylum_name, class_name, order_name, family_name, genus_name, species_name
+        data.drop(columns=['superkingdom_name', 'kingdom_name', 'phylum_name', 'class_name', 
+                           'order_name', 'family_name', 'genus_name', 'species_name'], inplace=True)
+        # Rename columns to match the hierarchical levels
+        data.rename(columns={
+            'level_1': 'kingdom_name',
+            'level_2': 'phylum_name',
+            'level_3': 'class_name',
+            'level_4': 'order_name'
+        }, inplace=True)
+        
+        # Save the final dataset with hierarchical levels
+        data.to_csv(output_file, index=False)
+        self.logger.info(f"Saved hierarchical dataset with levels to {output_file}")
+        
+        return data
     
 
 # Example usage
@@ -377,94 +258,18 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
     
     # Create filter instance
-    data_filter = TaxonomyDataFilter()
+    filter = TaxonomyDataFilter()
+
+    # Option 1: Starting from raw data
+    raw_params = {
+        'perl_script_path': "src/preprocessing/select_region.pl",
+        'input_tsv': "data/raw/NJORDR_sequences.tsv",
+        'names_dmp': "data/raw/names.dmp",
+        'nodes_dmp': "data/raw/nodes.dmp"
+    }
+    hierarchical_dataset = filter.create_hierarchical_dataset(raw_data_params=raw_params)
     
-    try:
-        # Load example data
-        input_file = "data/processed/cleaned_sequences.csv"
-        df = pd.read_csv(input_file)
-        print(f"Loaded {len(df)} records from {input_file}")
-        
-        # Example 1: Clean approximated names
-        # Option 1: Just normalize the names (remove approximation source)
-        normalized_df = data_filter.clean_approximated_names(df, remove_approximated=False)
-        print(f"Normalized names: {len(normalized_df)} records")
-        
-        # Option 2: Remove records with approximated names
-        filtered_df = data_filter.clean_approximated_names(df, remove_approximated=True)
-        print(f"After removing approximated names: {len(filtered_df)} records")
-        
-        # Example 2: Filter small classes
-        min_count = 10
-        target_column = "genus_name"
-        filtered_small_df = data_filter.filter_small_classes(df, min_count=min_count, target_column=target_column)
-        print(f"After filtering classes with fewer than {min_count} examples: {len(filtered_small_df)} records")
-        print(f"Number of {target_column} classes: {filtered_small_df[target_column].nunique()}")
-        
-        # Example 3: Filter by taxonomy
-        # Include only specific taxonomic groups
-        include_taxa = {
-            "phylum_name": ["Chordata", "Arthropoda"],
-            "class_name": ["Mammalia", "Aves", "Insecta"]
-        }
-        filtered_taxa_df = data_filter.filter_by_taxonomy(df, include_taxa, exclude=False)
-        print(f"After including specific taxa: {len(filtered_taxa_df)} records")
-        
-        # Exclude specific taxonomic groups
-        exclude_taxa = {
-            "order_name": ["Diptera", "Coleoptera"]
-        }
-        filtered_exclude_df = data_filter.filter_by_taxonomy(df, exclude_taxa, exclude=True)
-        print(f"After excluding specific taxa: {len(filtered_exclude_df)} records")
-        
-        # Example 4: Balance class representation
-        # Balance classes with minimum and maximum counts
-        balanced_df = data_filter.balance_class_representation(
-            df,
-            target_column="genus_name",
-            min_examples=5,
-            max_examples=50,
-            sampling_strategy="random"
-        )
-        print(f"After balancing classes: {len(balanced_df)} records")
-        genus_counts = balanced_df["genus_name"].value_counts()
-        print(f"Genus class statistics - Min: {genus_counts.min()}, Max: {genus_counts.max()}, Mean: {genus_counts.mean():.1f}")
-        
-        # Example 5: Comprehensive filtering for training
-        # Apply a complete workflow for preparing training data
-        training_df = data_filter.filter_for_balanced_training(
-            input_file=input_file,
-            target_rank="genus",
-            min_examples=10,
-            max_examples=100,
-            filter_approximated=True,
-            taxonomic_scope={"phylum_name": ["Chordata"]},
-            balance_sampling_strategy="diverse",
-            output_file="data/filtered/genus_balanced_training.csv"
-        )
-        
-        print(f"Prepared balanced training dataset: {len(training_df)} records")
-        print(f"Number of genera: {training_df['genus_name'].nunique()}")
-        
-        # Save filtered results for different scenarios
-        data_filter.clean_approximated_names(df, remove_approximated=False).to_csv(
-            "data/filtered/normalized_names.csv", index=False
-        )
-        
-        filtered_small_df.to_csv(
-            f"data/filtered/{target_column}_min{min_count}.csv", index=False
-        )
-        
-        filtered_taxa_df.to_csv(
-            "data/filtered/chordata_arthropoda_filtered.csv", index=False
-        )
-        
-        print("Saved filtered datasets to data/filtered/ directory")
-        
-    except Exception as e:
-        print(f"Error during filtering: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    # store the cleaned data
+    hierarchical_dataset.to_csv("data/processed/hierarchical_dataset_cleaned.csv", index=False)
     
         
