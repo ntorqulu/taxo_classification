@@ -68,7 +68,7 @@ class SequenceCoder:
             return np.zeros(4**k)
             
         # Filter out non-standard nucleotides
-        valid_seq = ''.join(c for c in sequence if c in SequeceCoder.LETTERS)
+        valid_seq = ''.join(c for c in sequence if c in SequenceCoder.LETTERS)
         
         # Early return if sequence is too short after filtering
         if len(valid_seq) < k:
