@@ -321,7 +321,7 @@ class SequenceCoder:
     
     # ===== BIT ENCODING OPTIMIZATIONS =====
     
-    def dna_to_bitcoding_optimized(self, sequence, bits=4):
+    def dna_to_bitcoding_optimized(self, sequence: str, bits: int = 4) -> np.ndarray:
         """Optimized bit encoding using pre-computed tables"""
         # Get the mapping for this bit size
         mapping = self.bit_mapping[bits]
@@ -338,7 +338,7 @@ class SequenceCoder:
                 result[pos:pos+bits] = bit_pattern
             pos += bits
             
-        return torch.from_numpy(result[:pos])
+        return result[:pos]
     
     def coding_one_hot_bit_optimized(self, sequences=None, bits=4, return_tensor=False,
                                    batch_size=1000, n_jobs=None):
