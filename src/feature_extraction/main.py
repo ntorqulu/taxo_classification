@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import multiprocessing as mp
 from functools import partial
-from collections import Counter
 import time
 
 class SequenceCoder:
