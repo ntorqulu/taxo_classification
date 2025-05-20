@@ -6,6 +6,11 @@
 /data/processed/*.csv
 /data/features/*.csv
 /data/filtered/*.csv
+/data/.DS_Store
+/data/database.csv.gz
+/data/database.csv
+/data/small_dataset.csv
+/data/database.parquet.gz
 
 # delete all files called structure.txt in any subdirectory
 **/structure.txt
@@ -16,3 +21,11 @@
 **/.DS_Store
 ***/.DS_Store
 
+data/database.csv.gz
+.gitignore
+data/processed/hierarchical_dataset_cleaned.csv.zip
+data/.DS_Store
+src/models/__pycache__/results.cpython-310.pyc
+src/preprocessing/__pycache__/cleaner.cpython-310.pyc
+src/preprocessing/__pycache__/filter.cpython-310.pyc
+src/preprocessing/__pycache__/formatter.cpython-310.pyc
