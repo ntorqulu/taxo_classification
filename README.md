@@ -67,6 +67,6 @@ To replicate the creation of the database, run the following command from a Unix
 ```bash
 cd taxo_classification
 python -m src.preprocessing.filter
-
+```
 
 ### Testing the architechtures
