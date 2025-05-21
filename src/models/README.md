@@ -9,6 +9,16 @@ point for further development.
 It’s important that this path points to the CSV file.
 3. Run `models/main.py`.
 
+commands to run:
+```
+cp data/database.csv /tmp/.
+# or 
+cp data/database.parquet /tmp/.
+
+# then run: 
+PYTHONPATH=$(pwd)/src/ python src/models/main.py
+```
+
 > ⚠️ **Warning:** The first execution may take around an hour due to k-mer encoding.  
 >  If you have a Parquet file, it must be in the same directory and have the same name but with a different extension.
 > For instance: `database.csv` and `database.parquet`.
