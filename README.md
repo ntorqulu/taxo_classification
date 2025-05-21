@@ -25,14 +25,48 @@ To obtained the results and to replicate them here we present the different step
 ### Obtain Database
 To obtain the database we used the sequences from [mkCOInr](https://github.com/meglecz/mkCOInr) as described in [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3) and can be downloaded from google drive: [NJORDR_sequences](https://drive.google.com/file/d/1YU_jIRIm9rpEC4okD5xh2qr3EnGBg3i8/view?usp=sharing), [names.dmp](https://drive.google.com/file/d/1WrRHX5Mf23ijg03K5YNaAx3dtzgIX5Zn/view?usp=sharing) and [nodes.dmp](https://drive.google.com/file/d/1D4g7PP-mdP9xqsxM9ZC_Bz9wqANkf6UN/view?usp=sharing). These are sequences from the public databases NCBI and BOLD and sequences obtained by scientific groups in University of Barcelona, Center for Advanced Studies of Blanes and Alfred Wagener Institute.
 
-To clean and format the database, the following steps were done: 
-- Merge the taxonomic information and cut the region defined by the Leray-XT primers with the class 'SequenceFormatter'.
-- Clean the data by removing duplicated, sequences with non-standard bases and filter sequences with too much GC bases with the class 'TaxonomyDataCleaner'.
-- finish the process by filtering by length (299-320) and define the classes to predict at different levels by selecting those classes more abundant and merging the others into Others as a prof of concept.
+### Preprocessing
 
-To replicate the creation of the database run the following command from a unix terminal:
-```
-python ...
-```
+To clean and format the database, the following steps were performed:
+
+#### 1. Format Raw Data with `SequenceFormatter` class
+- Merge the taxonomic information and cut the region defined by the Leray-XT primers using the `SequenceFormatter` class.
+- For each sequence, retain only the information regarding the following ranks: **Superkingdom**, **Kingdom**, **Phylum**, **Order**, **Species**.
+- If any sequence has one of these ranks empty, retrieve the information from the rank immediately below (or two levels below) and mark it as *predicted* for further standardization or removal.
+- Capitalize all bases in the sequence.
+
+#### 2. Clean Data with `TaxonomyDataCleaner` class
+- Remove sequences shorter than **299 bp**.
+- Filter out sequences with ambiguous bases (e.g., **N**).
+- Filter out sequences with non-standard bases.
+- Enforce taxonomy consistency across ranks: if two sequences are identical but their taxonomy assignments differ (excluding blanks), remove them as inconclusive.
+- Remove duplicate sequences.
+- Ensure complete taxonomic information up to the **species** level.
+
+#### 3. Create Hierarchical Dataset with `TaxonomyDataFilter` class
+- Filter sequences longer than **320 bp**.
+- Clean approximated or uncertain taxonomic names, removing or standardizing them.
+- Create four nested classification levels:
+
+  - **Level 1 (Kingdom)**:  
+    `Metazoa`, `Viridiplantae`, `Fungi`, `Other_euk`, `No_euk`
+
+  - **Level 2 (Phylum)**:  
+    `Arthropoda`, `Chordata`, `Mollusca`, `Annelida`, `Echinodermata`, `Platyhelminthes`, `Cnidaria`, `Other_metazoa`, `No_metazoa`
+
+  - **Level 3 (Class)**:  
+    `Insecta`, `Arachnida`, `Malacostraca`, `Collembola`, `Hexanauplia`, `Thecostraca`, `Branchiopoda`, `Diplopoda`, `Ostracoda`, `Chilopoda`, `Pycnogonida`, `Other_arthropoda`, `No_arthropoda`
+
+  - **Level 4 (Order)**:  
+    `Diptera`, `Lepidoptera`, `Hymenoptera`, `Coleoptera`, `Hemiptera`, `Trichoptera`, `Orthoptera`, `Ephemeroptera`, `Odonata`, `Blattodea`, `Thysanoptera`, `Psocoptera`, `Plecoptera`, `Neuroptera`, `Other_insecta`, `No_insecta`
+
+---
+
+To replicate the creation of the database, run the following command from a Unix terminal:
+
+```bash
+cd taxo_classification
+python -m src.preprocessing.filter
+
 
 ### Testing the architechtures
