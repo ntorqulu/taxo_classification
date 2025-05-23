@@ -45,8 +45,7 @@ class ParquetBuilder:
 
 
     def create_kmer_parquets(self, skip_if_exists: bool = True):
-        if self.df is None:
-            raise RuntimeError("You must load the database first")
+        assert self.df is not None
 
         for k in ParquetBuilder.KMERS_SIZES:
             col_name = encoding_column_name(k=k)
@@ -71,8 +70,7 @@ class ParquetBuilder:
             del df
 
     def create_bit_parquets(self, skip_if_exists: bool = True):
-        if self.df is None:
-            raise RuntimeError("You must load the database first")
+        assert self.df is not None
 
         for bits in self.sequence_coder.bit_mapping:
             col_name = encoding_column_name(bits=bits)
@@ -94,8 +92,7 @@ class ParquetBuilder:
             del df
 
     def create_4row_parquet(self, skip_if_exists: bool = True):
-        if self.df is None:
-            raise RuntimeError("You must load the database first")
+        assert self.df is not None
 
         path = get_parquet_path(self.csv_path, bits=0)
         if os.path.exists(path) and skip_if_exists:
