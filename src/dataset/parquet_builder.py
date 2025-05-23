@@ -1,7 +1,10 @@
 import os
+from typing import Callable, Any
+
 import pandas as pd
 from dataset.utils import get_default_data_dir, info, get_parquet_path, encoding_column_name
 from feature_extraction.main import SequenceCoder
+from multiprocessing import Process
 
 class ParquetBuilder:
     CATEGORY_COLUMNS = ["kingdom_name", "phylum_name", "class_name", "order_name"]
@@ -33,26 +36,24 @@ class ParquetBuilder:
         info(f"Loaded {len(df)} rows")
         return df
 
-    def create_dataset_parquet(self, skip_if_exists: bool = True):
+    def create_dataset_parquet(self):
         if self.df is None:
             raise RuntimeError("You must load the database first")
 
         path = get_parquet_path(self.csv_path)
-        if not os.path.exists(path) or not skip_if_exists:
+        if not os.path.exists(path):
             self.df.to_parquet(path, compression="gzip")
         else:
             info(f"Skipping main because exists {path}")
 
 
-    def create_kmer_parquets(self, skip_if_exists: bool = True):
-        assert self.df is not None
-
-        for k in ParquetBuilder.KMERS_SIZES:
+    def create_kmer_parquets(self, k: int | None= None, parallelize: bool = True):
+        if k is not None:
             col_name = encoding_column_name(k=k)
             path = get_parquet_path(self.csv_path, k=k)
-            if os.path.exists(path) and skip_if_exists:
+            if os.path.exists(path):
                 info(f"Skipping {k=} because exists {path}")
-                continue
+                return
 
             info(f"Encoding {col_name}")
             assert_s = self.df[self.sequence_column_name][0]
@@ -68,16 +69,24 @@ class ParquetBuilder:
             info(f"Saving '{path}'")
             df.to_parquet(path=path, compression="gzip")
             del df
+        elif not parallelize:
+            for k in ParquetBuilder.KMERS_SIZES:
+                self.create_kmer_parquets(k=k)
+        else:
+            processes = [Process(target=self.create_kmer_parquets, kwargs={"k": k})
+                         for k in ParquetBuilder.KMERS_SIZES]
+            for p in processes:
+                p.start()
+            for p in processes:
+                p.join()
 
-    def create_bit_parquets(self, skip_if_exists: bool = True):
-        assert self.df is not None
-
-        for bits in self.sequence_coder.bit_mapping:
+    def create_bit_parquets(self, bits: int | None = None, parallelize: bool = True):
+        if bits is not None:
             col_name = encoding_column_name(bits=bits)
             path = get_parquet_path(self.csv_path, bits=bits)
-            if os.path.exists(path) and skip_if_exists:
+            if os.path.exists(path):
                 info(f"Skipping {bits=} because exists {path}")
-                continue
+                return
 
             info(f"Encoding {col_name}")
             results = [self.sequence_coder.coding_one_hot_bit_optimized([s], bits)
@@ -90,12 +99,22 @@ class ParquetBuilder:
             info(f"Saving '{path}'")
             df.to_parquet(path=path, compression="gzip")
             del df
+        elif not parallelize:
+            for bits in self.sequence_coder.bit_mapping:
+                self.create_bit_parquets(bits=bits)
+        else:
+            processes = [Process(target=self.create_bit_parquets, kwargs={"bits": bits})
+                         for bits in self.sequence_coder.bit_mapping]
+            for p in processes:
+                p.start()
+            for p in processes:
+                p.join()
 
-    def create_4row_parquet(self, skip_if_exists: bool = True):
+    def create_4row_parquet(self):
         assert self.df is not None
 
         path = get_parquet_path(self.csv_path, bits=0)
-        if os.path.exists(path) and skip_if_exists:
+        if os.path.exists(path):
             info(f"Skipping '4 row matrix' because exists {path}")
         else:
             col_name = "4row"
@@ -121,17 +140,29 @@ class ParquetBuilder:
             del df
 
 
-    def create_parquets(self, skip_if_exists: bool = True):
+    def create_parquets(self, parallelize: bool = True):
         """
         encoder.coding_kmer_optimized(sequences=["ACGTT"], k=3) k 1..5
         encoder.coding_one_hot_4rowMatrix_optimized(sequences=["ACGTT"], return_tensor=True)
         encoder.coding_one_hot_bit_optimized(sequences=["ACGTT"], bits=4, return_tensor=True) 1..4
         """
+        functions: list[tuple[Callable, dict[str, Any]]] = [
+            (self.create_dataset_parquet, {}),
+            (self.create_kmer_parquets, {'parallelize': parallelize}),
+            (self.create_bit_parquets, {'parallelize': parallelize}),
+            (self.create_4row_parquet, {})
+        ]
 
-        self.create_dataset_parquet(skip_if_exists=skip_if_exists)
-        self.create_kmer_parquets(skip_if_exists=skip_if_exists)
-        self.create_bit_parquets(skip_if_exists=skip_if_exists)
-        self.create_4row_parquet(skip_if_exists=skip_if_exists)
+        if not parallelize:
+            for func, kwargs in functions:
+                func(**kwargs)
+        else:
+            processes = [Process(target=f[0], kwargs=f[1]) for f in functions]
+            for p in processes:
+                p.start()
+            for p in processes:
+                p.join()
+
         info(f"Parquets created")
 
 
@@ -166,7 +197,7 @@ class ParquetBuilder:
 
 def __main():
     p = ParquetBuilder()
-    p.create_parquets() # Uncomment if any parquet file does not exists
+    p.create_parquets(parallelize=False) # With parallelize=False, it takes less than 20 minutes.
     p.show_info_parquets()
 
 if __name__ == "__main__":
