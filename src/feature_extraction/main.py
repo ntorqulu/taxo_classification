@@ -125,7 +125,7 @@ class SequenceCoder:
             return -1  # Return invalid index on error
     
     def coding_kmer_optimized(self, sequences=None, k=3, write_number_of_occurrences=True,
-                             batch_size=1000, n_jobs=None):
+                             batch_size=1000, n_jobs=None) -> pd.array:
         """
         Optimized k-mer encoding with parallel processing for large datasets.
         """
@@ -184,7 +184,7 @@ class SequenceCoder:
         elapsed = time.time() - start_time
         print(f"K-mer encoding completed in {elapsed:.2f} seconds")
         
-        return torch.tensor(result, dtype=torch.float32)
+        return result
     
     def _process_kmer_batch(self, sequences, k, write_number_of_occurrences):
         """Helper function for parallel k-mer processing"""
