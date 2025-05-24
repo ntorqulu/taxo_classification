@@ -1,0 +1,12 @@
+{
+  "taxo_path": "",
+  "max_rows": 10000,
+  "seed": 123,
+  "epochs": 15,
+  "batch_size": 30,
+  "learning_rate": 0.001,
+  "label_column_name": "kingdom_name",
+  "k": 1,
+  "bits": null,
+  "hidden_size": null
+}

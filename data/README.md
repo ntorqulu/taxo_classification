@@ -23,3 +23,19 @@ The classes for each level were defined after inspecting the original data (see 
 - *level_2*: Second level of labels to predict, the classes belong to the Phylum level and enclosed in the "Metazoa" Kingdom --> 'Arthropoda','Chordata','Mollusca','Annelida','Echinodermata','Platyhelminthes','Cnidaria','Other_metazoa','No_metazoa'\
 - *level_3*: Third level of labels to predict, the classes belong to the Class level and enclosed in the "Arthropoda" phylum --> 'Insecta', 'Arachnida', 'Malacostraca', 'Collembola', 'Hexanauplia','Thecostraca', 'Branchiopoda', 'Diplopoda', 'Ostracoda', 'Chilopoda', 'Pycnogonida','Other_arthropoda','No_arthropoda'\
 - *level_4*: Fourth level of labels to predict, the classes belong to the Order level and enclosed in the "Insecta" Class --> 'Diptera', 'Lepidoptera', 'Hymenoptera', 'Coleoptera', 'Hemiptera','Trichoptera', 'Orthoptera', 'Ephemeroptera', 'Odonata', 'Blattodea','Thysanoptera', 'Psocoptera', 'Plecoptera', 'Neuroptera','Other_insecta','No_insecta'\
+
+# Parquet files
+
+To load the dataset.csv.gz:
+
+```python
+import pandas as pd
+df: pd.DataFrame = pd.read_csv("dataset.csv.gz")
+```
+
+To load a parquet file:
+
+```python
+import pandas as pd
+df: pd.DataFrame = pd.read_parquet("dataset.parquet")
+```
