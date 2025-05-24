@@ -5,8 +5,25 @@
   "epochs": 15,
   "batch_size": 30,
   "learning_rate": 0.001,
-  "label_column_name": "kingdom_name",
-  "k": 1,
+  "weight_decay": 1e-5,
+  "label_column_name": "phylum_name",
+  "k": 3,
   "bits": null,
-  "hidden_size": null
+  "hidden_size": null,
+  
+  "model_type": "cnn",
+  "optimizer": "adam",
+  "use_scheduler": true,
+  "scheduler": "plateau",
+  "scheduler_patience": 3,
+  "scheduler_factor": 0.5,
+  "patience": 5,
+  
+  "hidden_sizes": [256, 128],
+  "dropout": 0.2,
+  "use_batch_norm": true,
+  
+  "kernel_sizes": [3, 5, 7],
+  "num_filters": [64, 128, 256],
+  "fc_sizes": [512, 256]
 }
