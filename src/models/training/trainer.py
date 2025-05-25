@@ -42,6 +42,26 @@ class Trainer:
         self.scheduler = scheduler
         self.class_names = class_names if class_names is not None else []
         
+        if self.class_names:
+            # Get a simple dummy input to check output dimensions
+            dummy_batch = torch.zeros((1, model.input_size), device=self.device)
+            dummy_output = model(dummy_batch)
+            expected_classes = dummy_output.size(1)
+            
+            if len(self.class_names) != expected_classes:
+                info(f"Warning: Number of class names ({len(self.class_names)}) doesn't match model output size ({expected_classes})")
+                # Adjust class names to match model output size
+                if expected_classes > len(self.class_names):
+                    # Extend with generic labels
+                    self.class_names.extend([f"Class_{i}" for i in range(len(self.class_names), expected_classes)])
+                else:
+                    # Truncate
+                    self.class_names = self.class_names[:expected_classes]
+                info(f"Adjusted class names: {self.class_names}")
+        
+        # Create mapping from index to class name for easier lookup
+        self.class_idx_to_name = {idx: name for idx, name in enumerate(self.class_names)} if self.class_names else {}
+        
         # Set up logging
         self.log_dir = log_dir or os.path.join('runs', f"{model.name}_{time.strftime('%Y%m%d-%H%M%S')}")
         self.writer = SummaryWriter(log_dir=self.log_dir)
@@ -171,6 +191,12 @@ class Trainer:
         batch = next(iter(data_loader))
         output = self.model(batch[0][:1].to(self.device))
         num_classes = output.size(1)
+        
+        if epoch == 1 and prefix == 'val':
+            info(f"Class name mappings for {num_classes} classes:")
+            for class_idx in range(num_classes):
+                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
+                info(f"  Class index {class_idx} -> '{class_name}'")
         
         # Initialize counters for each class
         correct_per_class = torch.zeros(num_classes)
@@ -608,6 +634,18 @@ class Trainer:
             train_loss, train_acc = self.train_epoch(train_loader, epoch)
             history['train_loss'].append(train_loss)
             history['train_acc'].append(train_acc)
+            
+            # Calculate per-class metrics for training data (after train_epoch)
+            train_class_metrics = self.compute_per_class_metrics(train_loader, epoch, prefix='train')
+            history.setdefault('train_per_class_metrics', []).append(train_class_metrics)
+
+            # Log learning progress table for training data
+            self.log_learning_progress_table(train_class_metrics, epoch, prefix='train')
+
+            # Create training visualizations less frequently to avoid clutter
+            if epoch % 5 == 0 or epoch == 1 or epoch == epochs:
+                self.log_class_performance_chart(train_loader, epoch, prefix='train')
+                self.log_confusion_matrix(train_loader, epoch, prefix='train')
             
             # Validate
             val_loss, val_acc = self.evaluate(val_loader, epoch, prefix='val')

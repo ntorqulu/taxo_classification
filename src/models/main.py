@@ -8,6 +8,7 @@ import argparse
 from torch.utils.tensorboard import SummaryWriter
 from dataset.utils import info, get_default_dataset_path
 from dataset.taxo_dataloaders import TaxoDataLoaders
+from constants.taxonomy_labels import get_class_names
 from models.utils.model_factory import create_model
 from models.training.trainer import Trainer
 from models.results import Results, plot_results
@@ -19,6 +20,10 @@ def init_device(seed: int = 42) -> torch.device:
         torch.cuda.empty_cache()
         torch.cuda.manual_seed(seed)
         d = torch.device("cuda")
+    elif torch.backends.mps.is_available():  # For Apple Silicon (M1/M2/M3/M4)
+        torch.backends.mps.enable_prior_normalization = True
+        d = torch.device("mps")
+        info("Using Apple Metal Performance Shaders (MPS) backend")
     elif torch.xpu.is_available():
         torch.xpu.empty_cache()
         torch.xpu.manual_seed(seed)
@@ -123,8 +128,19 @@ def run_experiment(hparams: dict) -> dict:
     log_dir = os.path.join('runs', run_name)
     checkpoint_dir = os.path.join('checkpoints', run_name)
     
-    phylum_names = ['Arthropoda', 'Chordata', 'Mollusca', 'Annelida', 'Echinodermata', 
-           'Platyhelminthes', 'Cnidaria', 'Other_metazoa', 'No_metazoa']
+    class_names = get_class_names(hparams['label_column_name'])
+    info(f"Using {len(class_names)} labels for {hparams['label_column_name']} classification.")
+    
+    if class_names and taxo_data_loaders.num_labels != len(class_names):
+        info(f"Warning: Number of class names ({len(class_names)}) doesn't match the number of labels in the dataset ({taxo_data_loaders.num_labels}).")
+        # Adjust class_names to match the number of labels
+        if taxo_data_loaders.num_labels > len(class_names):
+            # Extend with generic labels
+            class_names.extend([f"Class_{i}" for i in range(len(class_names), taxo_data_loaders.num_labels)])
+        else:
+            # Truncate
+            class_names = class_names[:taxo_data_loaders.num_labels]
+        info(f"Adjusted class names to match dataset: {len(class_names)} labels.")
     
     trainer = Trainer(
         model=model,
@@ -134,7 +150,7 @@ def run_experiment(hparams: dict) -> dict:
         scheduler=scheduler,
         log_dir=log_dir,
         checkpoint_dir=checkpoint_dir,
-        class_names=phylum_names
+        class_names=class_names
     )
     
     # Train model
@@ -153,7 +169,21 @@ def run_experiment(hparams: dict) -> dict:
         'run_name': run_name
     }
 
+def check_available_devices():
+    info(f"PyTorch version: {torch.__version__}")
+    info(f"CUDA available: {torch.cuda.is_available()}")
+    # FOR APPLE SILICON
+    info(f"MPS available: {torch.backends.mps.is_available()}")
+    info(f"MPS backend enabled: {torch.backends.mps.is_built()}")
+    # Check for XPU (Intel GPU) support
+    if hasattr(torch, 'xpu'):
+        info(f"XPU available: {torch.xpu.is_available()}")
+    else:
+        info("XPU support not available in this PyTorch version.")
+    
+    
 def main():
+    check_available_devices()
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Train taxonomy classification models')
     parser.add_argument('--config', type=str, default='hparams.json', help='Path to hyperparameters JSON file')
