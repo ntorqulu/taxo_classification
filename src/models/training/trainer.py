@@ -42,23 +42,6 @@ class Trainer:
         self.scheduler = scheduler
         self.class_names = class_names if class_names is not None else []
         
-        if self.class_names:
-            # Get a simple dummy input to check output dimensions
-            dummy_batch = torch.zeros((1, model.input_size), device=self.device)
-            dummy_output = model(dummy_batch)
-            expected_classes = dummy_output.size(1)
-            
-            if len(self.class_names) != expected_classes:
-                info(f"Warning: Number of class names ({len(self.class_names)}) doesn't match model output size ({expected_classes})")
-                # Adjust class names to match model output size
-                if expected_classes > len(self.class_names):
-                    # Extend with generic labels
-                    self.class_names.extend([f"Class_{i}" for i in range(len(self.class_names), expected_classes)])
-                else:
-                    # Truncate
-                    self.class_names = self.class_names[:expected_classes]
-                info(f"Adjusted class names: {self.class_names}")
-        
         # Create mapping from index to class name for easier lookup
         self.class_idx_to_name = {idx: name for idx, name in enumerate(self.class_names)} if self.class_names else {}
         

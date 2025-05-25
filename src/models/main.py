@@ -124,7 +124,7 @@ def run_experiment(hparams: dict) -> dict:
             )
     
     # Set up trainer
-    run_name = f"{model.name}_{hparams['label_column_name']}_k{hparams['k']}"
+    run_name = f"{model.name}_{hparams['label_column_name']}_k{hparams['k']}" if hparams['k'] else f"{model.name}_{hparams['label_column_name']}_bits{hparams['bits']}"
     log_dir = os.path.join('runs', run_name)
     checkpoint_dir = os.path.join('checkpoints', run_name)
     
