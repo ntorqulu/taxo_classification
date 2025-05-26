@@ -16,3 +16,6 @@
 **/.DS_Store
 ***/.DS_Store
 
+# ignore all files in checkpoints directory
+/checkpoints/*
+
