@@ -19,7 +19,7 @@ class TaxoDataLoaders:
             max_rows=max_rows,
         )
 
-        train_dataset = self.all_dataset.new_split('all')
+        train_dataset = self.all_dataset.new_split('train')
         eval_dataset = self.all_dataset.new_split('eval')
         test_dataset = self.all_dataset.new_split('test')
 
