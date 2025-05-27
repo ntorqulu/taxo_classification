@@ -341,9 +341,20 @@ class SequenceCoder:
         return result[:pos]
     
     def coding_one_hot_bit_optimized(self, sequences=None, bits=4, return_tensor=False,
-                                   batch_size=1000, n_jobs=None):
+                                max_seq_length=200, batch_size=1000, n_jobs=None):
         """
-        Optimized bit encoding with optional batching and parallelization.
+        Optimized bit encoding with fixed output length.
+        
+        Args:
+            sequences: Input DNA sequences
+            bits: Number of bits per nucleotide (1-4)
+            return_tensor: Whether to return PyTorch tensor
+            max_seq_length: Maximum sequence length (will pad/truncate to this)
+            batch_size: Number of sequences to process at once
+            n_jobs: Number of parallel jobs
+            
+        Returns:
+            List of bit vectors or a tensor with shape [batch_size, max_seq_length*bits]
         """
         start_time = time.time()
         
@@ -355,11 +366,12 @@ class SequenceCoder:
         else:
             sequences_to_use = sequences
         
-        # print(f"Processing {len(sequences_to_use)} sequences for bit encoding (bits={bits})...")
-        
         # Determine number of parallel jobs
         if n_jobs is None:
             n_jobs = max(1, mp.cpu_count() - 1)
+        
+        # Calculate fixed output length
+        fixed_length = max_seq_length * bits
         
         # Process in batches to avoid memory issues
         bits_features = []
@@ -367,7 +379,6 @@ class SequenceCoder:
         # Process batches
         for i in range(0, len(sequences_to_use), batch_size):
             batch = sequences_to_use[i:min(i+batch_size, len(sequences_to_use))]
-            # print(f"Processing batch {i//batch_size + 1}/{(len(sequences_to_use)-1)//batch_size + 1}...")
             
             # Use parallel processing if batch is large enough
             if len(batch) > 100 and n_jobs > 1:
@@ -375,7 +386,7 @@ class SequenceCoder:
                 batch_splits = np.array_split(batch, n_jobs)
                 
                 # Create partial function with fixed parameters
-                func = partial(self._process_bit_batch, bits=bits)
+                func = partial(self._process_bit_batch, bits=bits, max_seq_length=max_seq_length)
                 
                 # Process in parallel
                 with mp.Pool(n_jobs) as pool:
@@ -386,33 +397,58 @@ class SequenceCoder:
                     bits_features.extend(result_list)
             else:
                 # Process sequentially for small batches
-                batch_result = self._process_bit_batch(batch, bits)
+                batch_result = self._process_bit_batch(batch, bits, max_seq_length)
                 bits_features.extend(batch_result)
         
         elapsed = time.time() - start_time
-        # print(f"Bit encoding completed in {elapsed:.2f} seconds")
         
-        # Optional tensor conversion with padding
+        # Convert to tensors or return list
         if return_tensor and bits_features:
-            return self.pad_and_batch_bit_vectors(bits_features)
+            return torch.tensor(np.stack(bits_features), dtype=torch.float32)
         
         return bits_features
-    
-    def _process_bit_batch(self, sequences, bits):
-        """Helper function for parallel bit encoding processing"""
+
+    def _process_bit_batch(self, sequences, bits, max_seq_length=None):
+        """
+        Helper function for parallel bit encoding processing with fixed length output.
+        
+        Args:
+            sequences: List of DNA sequences
+            bits: Number of bits per nucleotide
+            max_seq_length: Maximum sequence length (for fixed output size)
+            
+        Returns:
+            List of fixed-length bit vectors
+        """
         results = []
+        fixed_length = max_seq_length * bits if max_seq_length else None
         
         for seq in sequences:
             try:
-                result = self.dna_to_bitcoding_optimized(seq.upper(), bits)
-                results.append(result)
+                # Get raw bit encoding
+                bit_vector = self.dna_to_bitcoding_optimized(seq.upper(), bits)
+                
+                # Ensure fixed length if specified
+                if fixed_length:
+                    if len(bit_vector) > fixed_length:
+                        # Truncate if too long
+                        bit_vector = bit_vector[:fixed_length]
+                    elif len(bit_vector) < fixed_length:
+                        # Pad if too short
+                        padding = np.zeros(fixed_length - len(bit_vector), dtype=np.float32)
+                        bit_vector = np.concatenate([bit_vector, padding])
+                
+                results.append(bit_vector)
             except Exception as e:
-                print(f"Error processing sequence for bit encoding: {e}")
-                # Add empty tensor to maintain sequence count
-                results.append(torch.zeros(1, dtype=torch.float32))
+                # Create an empty vector of the right size on error
+                if fixed_length:
+                    results.append(np.zeros(fixed_length, dtype=np.float32))
+                else:
+                    # Or a minimal sized one if no fixed length
+                    results.append(np.zeros(4, dtype=np.float32))
         
         return results
-    
+        
     def pad_and_batch_bit_vectors(self, bit_features):
         """
         Pad bit vectors to the same length and batch them into a single tensor.

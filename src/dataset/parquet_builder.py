@@ -80,7 +80,7 @@ class ParquetBuilder:
             for p in processes:
                 p.join()
 
-    def create_bit_parquets(self, bits: int | None = None, parallelize: bool = True):
+    def create_bit_parquets(self, bits: int | None = None, parallelize: bool = True, max_seq_length: int = 320):
         if bits is not None:
             col_name = encoding_column_name(bits=bits)
             path = get_parquet_path(self.csv_path, bits=bits)
@@ -89,9 +89,26 @@ class ParquetBuilder:
                 return
 
             info(f"Encoding {col_name}")
-            results = [self.sequence_coder.coding_one_hot_bit_optimized([s], bits)
-                       for s in self.df[self.sequence_column_name]]
+            
+            # Find all sequences lengths to determine padding
+            seq_lengths = self.df[self.sequence_column_name].str.len()
+            info(f"Sequence length stats - Min: {seq_lengths.min()}, Mean: {seq_lengths.mean():.1f}, Max: {seq_lengths.max()}")
+            
+            if not max_seq_length:
+                # Use the maximum sequence length in the dataset
+                max_seq_length = int(seq_lengths.max())
+                info(f"Using max sequence length: {max_seq_length}")
+            
+            # Use fixed length bit encoding
+            results = [self.sequence_coder.coding_one_hot_bit_optimized(
+                [s], bits=bits, max_seq_length=max_seq_length)
+                for s in self.df[self.sequence_column_name]]
             results = [r[0] for r in results]
+            
+            # Verify all results have the same length
+            expected_length = max_seq_length * bits
+            all_same_length = all(len(r) == expected_length for r in results)
+            info(f"All vectors have same length ({expected_length}): {all_same_length}")
 
             info(f"Moving results to a dataframe")
             df = pd.DataFrame({col_name: results})
@@ -101,10 +118,10 @@ class ParquetBuilder:
             del df
         elif not parallelize:
             for bits in self.sequence_coder.bit_mapping:
-                self.create_bit_parquets(bits=bits)
+                self.create_bit_parquets(bits=bits, max_seq_length=max_seq_length)
         else:
-            processes = [Process(target=self.create_bit_parquets, kwargs={"bits": bits})
-                         for bits in self.sequence_coder.bit_mapping]
+            processes = [Process(target=self.create_bit_parquets, kwargs={"bits": bits, "max_seq_length": max_seq_length})
+                        for bits in self.sequence_coder.bit_mapping]
             for p in processes:
                 p.start()
             for p in processes:
