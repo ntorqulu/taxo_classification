@@ -1,329 +1,129 @@
 import os
-import random
-import time
 import torch
 import pandas as pd
-import numpy as np
-from typing import Callable, Literal
 from torch.utils.data import Dataset
-from dataset.utils import info, warn
+from dataset.cached_dataframe import CachedDataFrame
+from dataset.utils import info
+from dataset.parquet_builder import ParquetBuilder
+from feature_extraction.main import SequenceCoder
+
 
 class TaxoDataset(Dataset):
-    RANKS_COLUMN_NAMES: list[str] = [
-        'superkingdom_name',
+    FILTERS_COLUMN_NAMES: list[str] = [
         'kingdom_name',
         'phylum_name',
         'class_name',
-        'order_name',
-        'family_name',
-        'genus_name',
-        'species_name'
+        'order_name'
     ]
     # Discared columns seqID,taxID,scientific_name
 
-    # We cannot use parameters to set this value because we can have different instances of TaxoDataset
-    # using the cached DataFrame and the percentatge of the distribution has to be the same for all the
-    # instances
-    TRAIN_PCT = 0.8
-    EVAL_PCT = 0.1
-    TEST_PCT = 0.1
-    assert TRAIN_PCT + EVAL_PCT + TEST_PCT == 1.0
-
-    _cached_df: pd.DataFrame = None
-    _cached_path: str = None
-    _cached_file_size: int = 0
-    _cached_memory_usage: int = 0
-
-    @classmethod
-    def _is_df_cached(cls, taxo_path: str) -> bool:
-        if cls._cached_df is None:
-            return False
-        if cls._cached_path != taxo_path:
-            return False
-        file_size = os.path.getsize(taxo_path)
-        if cls._cached_file_size != file_size:
-            return False
-        return True
-
-    KMER_COLUMN_NAME = 'kmer'
+    SEQUENCE_COLUMN_NAME = 'sequence'
     LABEL_ID_COLUMN_NAME = 'label_id'
-    KMER_K = 3
 
     def __init__(self,
                  taxo_path: str,
-                 split: Literal['all', 'train', 'eval', 'test'],
-                 sequence_encoder: Callable[[str, int], np.ndarray],
-                 max_rows: int | float = 1.,
-                 ranks: dict[str, str] = None,
-                 sequence_column_name: str = "sequence",
-                 random_seed: int = random.randint(0, 100000),
-                 use_cache: bool = True,
+                 label_column_name: str,
+                 filters: dict[str, str] = None,
+                 k: int = None,
+                 bits: int = None,
                  ):
-        """
-        taxo_path: Path to a CSV file with the taxonomy. It has to have the a sequence_column_name column and a "label"
-                   column. Optionally, it can have other columns with the taxonomic ranks (depending on the ranks
-                   argument).
-        split: Split to load. It can be "all", "train", "eval" or "test".
-        max_rows: Maximum number of rows to load. If the value is int, it is used as the number of rows to load. If the
-                  number is float, it is used as a percentage of the total number of rows. Default is 1. as 100%
-                  This value reffers to all the splits together: split, eval and train.
-        ranks: A dictionary with the names of the taxonomic ranks and the names of the columns that contain the values.
-               The dictionary keys has to be one of the RANKS_COLUMN_NAMES. If the dictionary is empty, all the
-               taxonomic are loaded.
-        sequence_column_name: Sequence column name. Default is "sequence".
-        use_cache: If True, first try to use a memory cache of the DataFrame. If the cache is not valid, the dataset is
-                    loaded from a cached file, if not found, it is loaded from the original file and saved in a cached .
-                    memory and file for future use.
-                   If False, the dataset is loaded from the original file.
-        """
         super().__init__()
 
-        if not os.path.isfile(taxo_path):
-            raise FileNotFoundError(taxo_path)
-        if not split:
-            raise ValueError("split has to be a non-empty string")
-        if split not in ('all', 'train', 'eval', 'test'):
-            raise ValueError(f"Unrecognized split: {split}")
-        if max_rows <= 0:
-            raise ValueError("max_rows has to be a positive number.")
-        if isinstance(max_rows, float) and max_rows > 1.:
-            raise ValueError("If max_rows is a float, it has to be <= 1.0 (100%)")
-        if not ranks:
-            ranks = {}
-        elif any(k not in TaxoDataset.RANKS_COLUMN_NAMES for k in ranks.keys()):
-            raise ValueError(f"Unrecognized ranks keys: {ranks.keys()}")
+        if not filters:
+            filters = {}
+        elif any(r not in TaxoDataset.FILTERS_COLUMN_NAMES for r in filters.keys()):
+            raise ValueError(f"Unrecognized filter keys: {filters.keys()}")
+        if label_column_name not in self.FILTERS_COLUMN_NAMES:
+            raise ValueError(f"Unrecognized label column name: {label_column_name}")
+        if k is None and bits is None:
+            raise ValueError(f"Must specify k or bits")
+        if k is not None and k not in ParquetBuilder.KMERS_SIZES:
+            raise ValueError(f"Values allowed for k: {ParquetBuilder.KMERS_SIZES}")
+        if bits is not None and bits not in SequenceCoder().bit_mapping and bits != 0:
+            raise ValueError(f"Values allowed for bits: 0, {SequenceCoder().bit_mapping.keys()}")
+        if (k is not None) == (bits is not None):
+            raise ValueError(f"You only can specify k and bits, not both: {k=} {bits=}")
+        if any(not isinstance(f, str) for f in filters.values()):
+            raise NotImplementedError(f"Only strings are allowed as filter values")
 
-        self.taxo_path = taxo_path
-        self.sequence_encoder = sequence_encoder
-        self.ranks = ranks
-        self.sequence_column_name = sequence_column_name
-        self.label_column_name = TaxoDataset.RANKS_COLUMN_NAMES[3] # TODO:
-        self.use_cache = use_cache
-        self.random_seed = random_seed
-        self.split = split
-        self.df: pd.DataFrame = self._init_df()
-        self.labels_ids = self._init_labels_ids()
+        self.taxo_path: str = taxo_path
+        self.filters: dict[str, str] = filters
+        self.label_column_name: str = label_column_name
+        self.k: int | None = k
+        self.bits: int | None = bits
+        self.df: pd.DataFrame = CachedDataFrame.get_data_frame(self.taxo_path)
+        self.df_encoding: pd.DataFrame = CachedDataFrame.get_data_frame(self.taxo_path, k=self.k, bits=self.bits)
+        self.indexes: list[int] | None = self._init_indexes()
+        self.labels_ids: dict[str, int] = self._init_labels_ids()
 
-        kmer_lengths = self.df[TaxoDataset.KMER_COLUMN_NAME].apply(len)
-        self.data_length = kmer_lengths.max()
-        info(f"kmer lengths between {kmer_lengths.min()} and {kmer_lengths.max()}")
-
-        self.max_rows: int = self._init_max_rows(max_rows)
-        if self.max_rows == len(self.df):
-            self.row_indexes = []
-            self.start_index, self.end_index = TaxoDataset.split_indexes(length=len(self.df), split=self.split)
-        else:
-            self.row_indexes = self._init_row_indexes()
-            self.start_index, self.end_index = None, None
-
-    def _init_df(self) -> pd.DataFrame:
-        if self.use_cache and TaxoDataset._is_df_cached(self.taxo_path):
-            df = TaxoDataset._cached_df
-            info(f"Using cached contents of {TaxoDataset._cached_path }")
-            return df
-
-        parquet_path = TaxoDataset.get_parquet_path(self.taxo_path)
-        t0 = time.time()
-        if self.use_cache and os.path.exists(parquet_path):
-            info(f"Loading {parquet_path}")
-            df = pd.read_parquet(parquet_path)
-            save_parquet = False
-        else:
-            info(f"Loading {self.taxo_path} ")
-            t0 = time.time()
-            df = pd.read_csv(
-                self.taxo_path,
-                low_memory=False,
-                usecols = [self.sequence_column_name] + TaxoDataset.RANKS_COLUMN_NAMES
-            ) # low_memory=False to avoid warning about mixed types
-            info(f"Loaded {self.taxo_path} ")
-            info(f"Encoding")
-            df[TaxoDataset.KMER_COLUMN_NAME] = df[self.sequence_column_name].apply(
-                lambda seq: self.sequence_encoder(seq, 3)
-            )
-            info(f"Encoding finished")
-            save_parquet = self.use_cache
-
-        seconds = time.time() - t0
-        info(f"Loaded {len(df):,} rows in {seconds:.1f} seconds ")
-
-        if save_parquet:
-            info(f"Saving {parquet_path}")
-            df.to_parquet(parquet_path)
-            info(f"Saved")
-        TaxoDataset._cached_df = df
-        TaxoDataset._cached_path = self.taxo_path
-        TaxoDataset._cached_file_size = os.path.getsize(self.taxo_path)
-
-        return df
-
-    def _init_labels_ids(self) -> dict[str, int]:
-        # TODO: Calculate depending on the filters
-        label_values: list[str] = self.df[self.label_column_name].unique().tolist()
-        label_idx_value = {l[1] : l[0] for l in enumerate(label_values)}
-        info(f"There is {len(label_idx_value)} labels available.")
-        return label_idx_value
-
-    def _init_max_rows(self, max_rows: int | float) -> int:
-        if isinstance(max_rows, float):
-            pct_rows = max_rows
-            return int(len(self.df) * pct_rows)
-        elif isinstance(max_rows, int):
-            if len(self.df) < max_rows:
-                warn(f"{max_rows=} is higher than the number of total rows ({len(self.df)})."
-                     f" Adjusting to {len(self.df)} rows.")
-                return len(self.df)
-            else:
-                return max_rows
-        raise ValueError(f"max_rows has to be a float or an int, not {type(max_rows)}")
-
-    def _init_row_indexes(self) -> list[int]:
-        local_random = random.Random(self.random_seed)
-        random_indexes = local_random.sample(range(len(self.df)), self.max_rows)
-        start_idx, end_idx = TaxoDataset.split_indexes(length=len(random_indexes), split=self.split)
-        row_indexes = random_indexes[start_idx:end_idx]
-        return row_indexes
-
-    @property
-    def df_memory_usage_mb(self) -> int:
-        if TaxoDataset._cached_memory_usage == 0:
-            TaxoDataset._cached_memory_usage = self.df.memory_usage(deep=True).sum() / (1024 ** 2)
-        return TaxoDataset._cached_memory_usage
-
-    @property
-    def num_labels(self):
-        #TODO: filters
-        return len(self.labels_ids)
-
-    def new_split(self, split: Literal['all', 'train', 'eval', 'test']) -> 'TaxoDataset':
+    def _init_indexes(self) -> list[int] | None:
         """
-        Splits the dataset based on the specified subset type.
-
-        This method creates a new instance of the `TaxoDataset` class that corresponds
-        to the specified subset of the dataset. The subset type can be one of
-        'all', 'train', 'eval', or 'test'. The method allows working with different
-        partitions of the dataset without modifying the original dataset instance.
-
-        Parameters
-        ----------
-        split : Literal['all', 'train', 'eval', 'test']
-            Specifies the subset type of the dataset to return. It determines whether
-            the entire dataset or a specific split (training, evaluation, or test)
-            is accessed.
-
+        Initializes the list of indexes of the values for the filters
         Returns
         -------
-        TaxoDataset
-            A new instance of the `TaxoDataset` class corresponding to the specified
-            subset type.
+        The list of indexes or None if no filters
         """
-        return TaxoDataset(taxo_path=self.taxo_path,
-                           sequence_encoder=self.sequence_encoder,
-                           sequence_column_name=self.sequence_column_name,
-                           ranks=self.ranks,
-                           split=split,
-                           max_rows=self.max_rows,
-                           random_seed=self.random_seed,
-                           use_cache=self.use_cache)
+        if not self.filters:
+            return None
+
+        missing = set(self.filters.keys()) - set(self.df.columns) # TODO: AIxò cal?
+        if missing:
+            raise ValueError(f"Unrecognized filter key(s): {', '.join(missing)} (column(s) do not exist)")
+
+        mask = pd.Series(True, index=self.df.index)
+        for colum_name, values in self.filters.items():
+            mask &= self.df[colum_name].isin([values])
+        indexes = self.df[mask].index.tolist()
+        return indexes
+
+    def _init_labels_ids(self) -> dict[str, int]:
+        """
+        Returns
+        -------
+        Returns an id for each label value of teh  current self.label_column_name
+        """
+        label_values: pd.Series
+        if self.indexes is None:
+            label_values = self.df[self.label_column_name]
+        else:
+            label_values = self.df.loc[self.indexes, self.label_column_name]
+
+        unique_values: list[str] = label_values.unique().tolist()
+        label_ids = {l[1]: l[0] for l in enumerate(unique_values)}
+        info(f"There is {len(label_ids)} labels available.")
+
+        return label_ids
+
+    @property
+    def num_labels(self) -> int:
+        return len(self.labels_ids)
+
+    @property
+    def data_length(self) -> int:
+        return len(self.df_encoding.iloc[0, 0]) # TODO: Sempre és la mateixa mida?
 
     def __len__(self) -> int:
-        if self.row_indexes:
-            l = len(self.row_indexes)
+        if self.indexes:
+            l = len(self.indexes)
         else:
-            l = self.end_index - self.start_index + 1
+            l = len(self.df)
         return l
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         if idx < 0:
             raise IndexError(f"Index {idx} is negative")
         if idx >= len(self):
-            raise IndexError(f"Index {idx} is higher than the maximum number of rows ({self.max_rows})")
+            raise IndexError(f"Index {idx} is higher than the maximum number of rows ({len(self)})")
 
-        if self.row_indexes:
-            idx = self.row_indexes[idx]
-        else:
-            idx = self.start_index + idx
-        row = self.df.iloc[idx]
-        label = row[self.label_column_name]
-        label = [self.labels_ids[label]]
-        label = torch.tensor(label, dtype=torch.long).view(-1)
-        kmer = row[TaxoDataset.KMER_COLUMN_NAME]
-        tensor = torch.tensor(kmer, dtype=torch.float32)
-        return tensor, label
+        if self.indexes:
+            idx = self.indexes[idx]
 
-    @staticmethod
-    def split_indexes(length: int,
-                      split: Literal['all', 'train', 'eval', 'test'],
-                      train_pct: float = TRAIN_PCT,
-                      eval_pct: float = EVAL_PCT,
-                      ) -> tuple[int, int]:
-        """
-        Splits a dataset's index range into subsets based on specified fractions.
+        label_row = self.df.iloc[idx]
+        label = label_row[self.label_column_name]
+        label = self.labels_ids[label]
+        label = torch.tensor([label], dtype=torch.long).view(-1)
 
-        This function calculates index ranges for train, evaluation, and test
-        subsets of data using the given proportions. The user specifies which
-        split subset range they wish to retrieve through the `split` parameter.
+        encoding = self.df_encoding.iloc[idx, 0]
+        encoding = torch.tensor(encoding, dtype=torch.float32)
 
-        The function assumes that the total size of dataset corresponds to the
-        provided `length` parameter. The sum of train, evaluation, and test proportions
-        (derived from `train_pct` and `eval_pct`, with the remaining allocated
-        to test) must exactly equal the dataset size.
-
-        Parameters
-        ----------
-        length : int
-            Total number of elements in the dataset. Must be a positive integer.
-        split : {'all', 'train', 'eval', 'test'}
-            The desired subset of data to compute index range for. Options
-            include:
-
-            - 'all': Returns indices for the entire dataset.
-            - 'train': Returns indices for the training subset.
-            - 'eval': Returns indices for the evaluation/validation subset.
-            - 'test': Returns indices for the testing subset.
-        train_pct : float
-            The fraction of the dataset to allocate for training. Must be in
-            the range [0, 1].
-        eval_pct : float
-            The fraction of the dataset to allocate for evaluation. Must be in
-            the range [0, 1].
-
-        Returns
-        -------
-        tuple of (int, int)
-            A tuple of two integers representing the start and end indices
-            (inclusive) for the requested subset based on the `split` parameter.
-
-        Raises
-        ------
-        ValueError
-            If an unrecognized value is provided for the `split` parameter.
-        """
-        train_start = 0
-        train_end = int(length * train_pct) - 1
-        eval_start = train_end + 1
-        eval_end = eval_start + int(length * eval_pct) - 1
-        test_start = eval_end + 1
-        test_end = length - 1
-        test_pct = (100 - train_pct*100 - eval_pct*100)/100 # We do this to avoid floating point errors
-        assert test_end -2 <= test_start + int(length * test_pct) - 1 < test_end + 1
-        assert (train_end - train_start + 1) + (eval_end - eval_start + 1) + (test_end - test_start + 1) == length
-        if split == 'train':
-            start_idx, end_idx = train_start, train_end
-        elif split == 'eval':
-            start_idx, end_idx = eval_start, eval_end
-        elif split == 'test':
-            start_idx, end_idx = test_start, test_end
-        elif split == 'all':
-            start_idx, end_idx = 0, length - 1
-        else:
-            raise ValueError(f"Unrecognized split: {split}")
-        return start_idx, end_idx
-
-    @staticmethod
-    def get_parquet_path(csv_path: str):
-        if csv_path.lower().endswith(".csv"):
-            parquet_path = csv_path[:-len(".csv")] + ".parquet"
-        else:
-            parquet_path = csv_path + ".parquet"
-        return parquet_path
+        return encoding, label

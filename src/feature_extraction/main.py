@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import multiprocessing as mp
 from functools import partial
-from collections import Counter
 import time
 
 class SequenceCoder:
@@ -36,16 +35,16 @@ class SequenceCoder:
         The CSV file should have a column named 'sequence'.
         """
         start_time = time.time()
-        if verbose:
-            print(f"Loading sequences from {file_path}...")
+        #if verbose:
+        #    print(f"Loading sequences from {file_path}...")
         
         # Use chunk loading for very large files
         if file_path.endswith('.csv'):
             chunks = pd.read_csv(file_path, chunksize=100000)
             sequence_chunks = []
             for i, chunk in enumerate(chunks):
-                if verbose and i % 10 == 0:
-                    print(f"Processed {i*100000} sequences...")
+                #if verbose and i % 10 == 0:
+                #    print(f"Processed {i*100000} sequences...")
                 sequence_chunks.append(chunk['sequence'])
             self.entries = pd.concat(sequence_chunks)
             self.sequences = list(self.entries)
@@ -55,11 +54,11 @@ class SequenceCoder:
         
         if verbose:
             elapsed = time.time() - start_time
-            print(f"Loaded {len(self.sequences)} sequences in {elapsed:.2f} seconds")
+            #print(f"Loaded {len(self.sequences)} sequences in {elapsed:.2f} seconds")
 
     # ===== K-MER ENCODING OPTIMIZATIONS =====
     
-    def kmerize_one_seq_optimized(self, sequence: str, k: int, write_number_of_occurrences: bool=True):
+    def kmerize_one_seq_optimized(self, sequence: str, k: int, write_number_of_occurrences: bool=True) -> np.ndarray:
         """
         Optimized version of k-mer counting for a single sequence.
         """
@@ -126,7 +125,7 @@ class SequenceCoder:
             return -1  # Return invalid index on error
     
     def coding_kmer_optimized(self, sequences=None, k=3, write_number_of_occurrences=True,
-                             batch_size=1000, n_jobs=None):
+                             batch_size=1000, n_jobs=None) -> pd.array:
         """
         Optimized k-mer encoding with parallel processing for large datasets.
         """
@@ -140,7 +139,7 @@ class SequenceCoder:
         else:
             sequences_to_use = sequences
         
-        print(f"Processing {len(sequences_to_use)} sequences with k={k}...")
+        #print(f"Processing {len(sequences_to_use)} sequences with k={k}...")
         
         # Determine number of parallel jobs
         if n_jobs is None:
@@ -158,7 +157,7 @@ class SequenceCoder:
         # Process batches
         for i in range(0, len(valid_sequences), batch_size):
             batch = valid_sequences[i:min(i+batch_size, len(valid_sequences))]
-            print(f"Processing batch {i//batch_size + 1}/{(len(valid_sequences)-1)//batch_size + 1}...")
+            #print(f"Processing batch {i//batch_size + 1}/{(len(valid_sequences)-1)//batch_size + 1}...")
             
             # Use parallel processing if batch is large enough
             if len(batch) > 100 and n_jobs > 1:
@@ -183,9 +182,9 @@ class SequenceCoder:
             result[i:i+len(batch_result)] = batch_result
         
         elapsed = time.time() - start_time
-        print(f"K-mer encoding completed in {elapsed:.2f} seconds")
+        # print(f"K-mer encoding completed in {elapsed:.2f} seconds")
         
-        return torch.tensor(result, dtype=torch.float32)
+        return result
     
     def _process_kmer_batch(self, sequences, k, write_number_of_occurrences):
         """Helper function for parallel k-mer processing"""
@@ -237,7 +236,7 @@ class SequenceCoder:
         else:
             sequences_to_use = sequences
         
-        print(f"Processing {len(sequences_to_use)} sequences for matrix encoding...")
+        #print(f"Processing {len(sequences_to_use)} sequences for matrix encoding...")
         
         # Determine number of parallel jobs
         if n_jobs is None:
@@ -249,7 +248,7 @@ class SequenceCoder:
         # Process batches
         for i in range(0, len(sequences_to_use), batch_size):
             batch = sequences_to_use[i:min(i+batch_size, len(sequences_to_use))]
-            print(f"Processing batch {i//batch_size + 1}/{(len(sequences_to_use)-1)//batch_size + 1}...")
+            #print(f"Processing batch {i//batch_size + 1}/{(len(sequences_to_use)-1)//batch_size + 1}...")
             
             # Use parallel processing if batch is large enough
             if len(batch) > 100 and n_jobs > 1:
@@ -269,7 +268,7 @@ class SequenceCoder:
                 matrix_features.extend(batch_result)
         
         elapsed = time.time() - start_time
-        print(f"Matrix encoding completed in {elapsed:.2f} seconds")
+        #print(f"Matrix encoding completed in {elapsed:.2f} seconds")
         
         # Optional tensor conversion with padding
         if return_tensor and matrix_features:
@@ -322,7 +321,7 @@ class SequenceCoder:
     
     # ===== BIT ENCODING OPTIMIZATIONS =====
     
-    def dna_to_bitcoding_optimized(self, sequence, bits=4):
+    def dna_to_bitcoding_optimized(self, sequence: str, bits: int = 4) -> np.ndarray:
         """Optimized bit encoding using pre-computed tables"""
         # Get the mapping for this bit size
         mapping = self.bit_mapping[bits]
@@ -339,12 +338,23 @@ class SequenceCoder:
                 result[pos:pos+bits] = bit_pattern
             pos += bits
             
-        return torch.from_numpy(result[:pos])
+        return result[:pos]
     
     def coding_one_hot_bit_optimized(self, sequences=None, bits=4, return_tensor=False,
-                                   batch_size=1000, n_jobs=None):
+                                max_seq_length=200, batch_size=1000, n_jobs=None):
         """
-        Optimized bit encoding with optional batching and parallelization.
+        Optimized bit encoding with fixed output length.
+        
+        Args:
+            sequences: Input DNA sequences
+            bits: Number of bits per nucleotide (1-4)
+            return_tensor: Whether to return PyTorch tensor
+            max_seq_length: Maximum sequence length (will pad/truncate to this)
+            batch_size: Number of sequences to process at once
+            n_jobs: Number of parallel jobs
+            
+        Returns:
+            List of bit vectors or a tensor with shape [batch_size, max_seq_length*bits]
         """
         start_time = time.time()
         
@@ -356,11 +366,12 @@ class SequenceCoder:
         else:
             sequences_to_use = sequences
         
-        print(f"Processing {len(sequences_to_use)} sequences for bit encoding (bits={bits})...")
-        
         # Determine number of parallel jobs
         if n_jobs is None:
             n_jobs = max(1, mp.cpu_count() - 1)
+        
+        # Calculate fixed output length
+        fixed_length = max_seq_length * bits
         
         # Process in batches to avoid memory issues
         bits_features = []
@@ -368,7 +379,6 @@ class SequenceCoder:
         # Process batches
         for i in range(0, len(sequences_to_use), batch_size):
             batch = sequences_to_use[i:min(i+batch_size, len(sequences_to_use))]
-            print(f"Processing batch {i//batch_size + 1}/{(len(sequences_to_use)-1)//batch_size + 1}...")
             
             # Use parallel processing if batch is large enough
             if len(batch) > 100 and n_jobs > 1:
@@ -376,7 +386,7 @@ class SequenceCoder:
                 batch_splits = np.array_split(batch, n_jobs)
                 
                 # Create partial function with fixed parameters
-                func = partial(self._process_bit_batch, bits=bits)
+                func = partial(self._process_bit_batch, bits=bits, max_seq_length=max_seq_length)
                 
                 # Process in parallel
                 with mp.Pool(n_jobs) as pool:
@@ -387,33 +397,58 @@ class SequenceCoder:
                     bits_features.extend(result_list)
             else:
                 # Process sequentially for small batches
-                batch_result = self._process_bit_batch(batch, bits)
+                batch_result = self._process_bit_batch(batch, bits, max_seq_length)
                 bits_features.extend(batch_result)
         
         elapsed = time.time() - start_time
-        print(f"Bit encoding completed in {elapsed:.2f} seconds")
         
-        # Optional tensor conversion with padding
+        # Convert to tensors or return list
         if return_tensor and bits_features:
-            return self.pad_and_batch_bit_vectors(bits_features)
+            return torch.tensor(np.stack(bits_features), dtype=torch.float32)
         
         return bits_features
-    
-    def _process_bit_batch(self, sequences, bits):
-        """Helper function for parallel bit encoding processing"""
+
+    def _process_bit_batch(self, sequences, bits, max_seq_length=None):
+        """
+        Helper function for parallel bit encoding processing with fixed length output.
+        
+        Args:
+            sequences: List of DNA sequences
+            bits: Number of bits per nucleotide
+            max_seq_length: Maximum sequence length (for fixed output size)
+            
+        Returns:
+            List of fixed-length bit vectors
+        """
         results = []
+        fixed_length = max_seq_length * bits if max_seq_length else None
         
         for seq in sequences:
             try:
-                result = self.dna_to_bitcoding_optimized(seq.upper(), bits)
-                results.append(result)
+                # Get raw bit encoding
+                bit_vector = self.dna_to_bitcoding_optimized(seq.upper(), bits)
+                
+                # Ensure fixed length if specified
+                if fixed_length:
+                    if len(bit_vector) > fixed_length:
+                        # Truncate if too long
+                        bit_vector = bit_vector[:fixed_length]
+                    elif len(bit_vector) < fixed_length:
+                        # Pad if too short
+                        padding = np.zeros(fixed_length - len(bit_vector), dtype=np.float32)
+                        bit_vector = np.concatenate([bit_vector, padding])
+                
+                results.append(bit_vector)
             except Exception as e:
-                print(f"Error processing sequence for bit encoding: {e}")
-                # Add empty tensor to maintain sequence count
-                results.append(torch.zeros(1, dtype=torch.float32))
+                # Create an empty vector of the right size on error
+                if fixed_length:
+                    results.append(np.zeros(fixed_length, dtype=np.float32))
+                else:
+                    # Or a minimal sized one if no fixed length
+                    results.append(np.zeros(4, dtype=np.float32))
         
         return results
-    
+        
     def pad_and_batch_bit_vectors(self, bit_features):
         """
         Pad bit vectors to the same length and batch them into a single tensor.
@@ -455,11 +490,6 @@ class SequenceCoder:
             return self.coding_one_hot_bit_optimized(sequences, batch_size=batch_size, **kwargs)
         else:
             raise ValueError(f"Unknown method: {method}")
-
-def kmer_encoder(sequence: str, k: int) -> np.ndarray:
-    kmer = SequenceCoder().kmerize_one_seq_optimized(sequence, k)
-    return kmer
-
 
 # Example usage
 if __name__ == "__main__":
