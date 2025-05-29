@@ -10,12 +10,7 @@ class CachedDataFrame:
     _bits_encodings: dict[int, pd.DataFrame] = {}
 
     @classmethod
-    def flush_cache(cls):
-        if cls._df is not None:
-            del cls._df
-            gc.collect()
-        cls._df: pd.DataFrame = None
-        cls._parquet_path = None
+    def flush_encodings_cache(cls):
         for k in cls._k_encodings:
             df = cls._k_encodings[k]
             del df
@@ -26,6 +21,15 @@ class CachedDataFrame:
             del df
             gc.collect()
         cls._bits_encodings = {}
+
+    @classmethod
+    def flush_cache(cls):
+        if cls._df is not None:
+            del cls._df
+            gc.collect()
+        cls._df: pd.DataFrame = None
+        cls._parquet_path = None
+        cls.flush_encodings_cache()
 
     @classmethod
     def _is_main_cached(cls) -> bool:
