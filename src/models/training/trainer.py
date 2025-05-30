@@ -73,6 +73,9 @@ class Trainer:
         
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(self.device), target.to(self.device)
+            if data.dim() == 3:  # [batch, 4, 313]
+                data = data.unsqueeze(1)  # [batch, 1, 4, 313]
+            # print(f"Epoch {epoch}, data dim {data.dim()}, data_shape {data.shape}, Batch size: {data.shape[0]}")
             
             # Zero gradients
             self.optimizer.zero_grad()
@@ -130,7 +133,8 @@ class Trainer:
         
         for data, target in val_loader:
             data, target = data.to(self.device), target.to(self.device)
-            
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
             # Forward pass
             output = self.model(data)
             
@@ -172,7 +176,11 @@ class Trainer:
         
         # Get number of classes from first batch
         batch = next(iter(data_loader))
-        output = self.model(batch[0][:1].to(self.device))
+        sample = batch[0][:1].to(self.device)  # [1, 4, 313]
+        if sample.dim() == 3:
+            sample = sample.unsqueeze(1)  # [1, 1, 4, 313]
+        # print(f"Epoch {epoch}, sample dim {sample.dim()}, sample_shape {sample.shape}")
+        output = self.model(sample)
         num_classes = output.size(1)
         
         if epoch == 1 and prefix == 'val':
@@ -189,8 +197,10 @@ class Trainer:
         # Process all batches
         for data, target in data_loader:
             data, target = data.to(self.device), target.view(-1).to(self.device)
-            
-            # Forward pass
+            # print(f"Epoch {epoch}, data dim {data.dim()}, data_shape {data.shape}, Batch size: {data.shape[0]}")
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
+            # print(f"Epoch {epoch}, data dim {data.dim()}, data_shape {data.shape}, Batch size: {data.shape[0]}")
             output = self.model(data)
             predictions = output.argmax(dim=1)
             
@@ -272,6 +282,8 @@ class Trainer:
         with torch.no_grad():
             for data, target in data_loader:
                 data, target = data.to(self.device), target.to(self.device)
+                if data.dim() == 3:
+                    data = data.unsqueeze(1)
                 output = self.model(data)
                 preds = output.argmax(dim=1)
                 

@@ -151,6 +151,7 @@ class ParquetBuilder:
             assert all(len(r) == 1 for r in results)
             assert all(r[0].shape[0] == 4 for r in results)
             df = pd.DataFrame({
+                "seqID": self.df.seqID,
                 f"{col_name}_1": [r[0][0] for r in results],
                 f"{col_name}_2": [r[0][1] for r in results],
                 f"{col_name}_3": [r[0][2] for r in results],

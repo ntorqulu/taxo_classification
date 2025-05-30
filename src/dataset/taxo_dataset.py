@@ -1,6 +1,7 @@
 import os
 import torch
 import pandas as pd
+import numpy as np
 from torch.utils.data import Dataset
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.utils import info
@@ -55,6 +56,11 @@ class TaxoDataset(Dataset):
         self.df_encoding: pd.DataFrame = CachedDataFrame.get_data_frame(self.taxo_path, k=self.k, bits=self.bits)
         self.indexes: list[int] | None = self._init_indexes()
         self.labels_ids: dict[str, int] = self._init_labels_ids()
+        if bits is not None and bits == 0:
+            self.df = self.df[self.df['seqID'].isin(self.df_encoding['seqID'])]
+            # reindex the DataFrame to avoid issues with the indexes
+            self.df = self.df.reset_index(drop=True)
+            
 
     def _init_indexes(self) -> list[int] | None:
         """
@@ -123,7 +129,12 @@ class TaxoDataset(Dataset):
         label = self.labels_ids[label]
         label = torch.tensor([label], dtype=torch.long).view(-1)
 
-        encoding = self.df_encoding.iloc[idx, 0]
-        encoding = torch.tensor(encoding, dtype=torch.float32)
+        if self.bits is not None and self.bits == 0:
+            # If bits is 0, we are using a 4-row matrix encoding
+            encoding = np.stack(self.df_encoding.iloc[idx, 1:].values)
+            encoding = torch.tensor(encoding, dtype=torch.float32)
+        else:
+            encoding = self.df_encoding.iloc[idx, 0]
+            encoding = torch.tensor(encoding, dtype=torch.float32)
 
         return encoding, label
