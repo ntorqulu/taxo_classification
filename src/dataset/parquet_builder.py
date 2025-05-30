@@ -127,7 +127,7 @@ class ParquetBuilder:
             for p in processes:
                 p.join()
 
-    def create_4row_parquet(self):
+    def create_4row_parquet(self, seq_length: int = 313):
         assert self.df is not None
 
         path = get_parquet_path(self.csv_path, bits=0)
@@ -136,10 +136,15 @@ class ParquetBuilder:
         else:
             col_name = "4row"
             info(f"Encoding {col_name}")
+            # filter the df by sequence length
+            self.df = self.df[self.df[self.sequence_column_name].str.len() == seq_length]
+            if self.df.empty:
+                raise ValueError(f"No sequences found with length {seq_length} in {self.sequence_column_name} column.")
+            info(f"Filtered dataframe to {len(self.df)} rows with sequence length {seq_length}")
             s = self.df[self.sequence_column_name][0]
             s = self.sequence_coder.coding_one_hot_4rowMatrix_optimized([s], return_tensor=False)
             results = [self.sequence_coder.coding_one_hot_4rowMatrix_optimized([s], return_tensor=False)
-                       for s in self.df[self.sequence_column_name]]
+                        for s in self.df[self.sequence_column_name]]
 
             info(f"Moving results to a dataframe")
             # We do this way to avoid "PerformanceWarning: DataFrame is highly fragmented."
@@ -211,6 +216,42 @@ class ParquetBuilder:
         for k in ParquetBuilder.KMERS_SIZES:
             p = get_parquet_path(self.csv_path, k=k)
             print_basic_info(p)
+    
+    def create_parquets_unique(self, coding, parallelize: bool = True):
+        """
+        encoder.coding_kmer_optimized(sequences=["ACGTT"], k=3) k 1..5
+        encoder.coding_one_hot_4rowMatrix_optimized(sequences=["ACGTT"], return_tensor=True)
+        encoder.coding_one_hot_bit_optimized(sequences=["ACGTT"], bits=4, return_tensor=True) 1..4
+        """
+        if coding not in ['kmer', 'bit', '4row']:
+            raise ValueError(f"Invalid coding type: {coding}. Choose from 'kmer', 'bit', or '4row'.")
+        if coding == 'kmer':
+            functions: list[tuple[Callable, dict[str, Any]]] = [
+                (self.create_dataset_parquet, {}),
+                (self.create_kmer_parquets, {'parallelize': parallelize}),
+            ]
+        elif coding == 'bit':
+            functions: list[tuple[Callable, dict[str, Any]]] = [
+                (self.create_dataset_parquet, {}),
+                (self.create_bit_parquets, {'parallelize': parallelize}),
+            ]
+        elif coding == '4row':
+            functions: list[tuple[Callable, dict[str, Any]]] = [
+                (self.create_dataset_parquet, {}),
+                (self.create_4row_parquet, {})
+            ]
+
+        if not parallelize:
+            for func, kwargs in functions:
+                func(**kwargs)
+        else:
+            processes = [Process(target=f[0], kwargs=f[1]) for f in functions]
+            for p in processes:
+                p.start()
+            for p in processes:
+                p.join()
+
+        info(f"Parquets created")
 
 def __main():
     p = ParquetBuilder()
