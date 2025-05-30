@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
+from typing import Dict, Any, List, Optional, Tuple
+from models.architectures.base_model import BaseModel
 
 
 
-class nanni_cnn1(nn.Module):
+class nanni_cnn1(BaseModel):
     # - Convolution2d(3, 16, ‘Padding’, ‘same’): The size of the convolutional kernel/filter is
     # 3 × 3. The number of filters is 16. ‘Padding’, ‘same’ means the padding is set so that
     # the spatial dimensions of the input and output feature maps are the same.
@@ -25,13 +27,16 @@ class nanni_cnn1(nn.Module):
                  sequence_length: int,
                  hidden_size: int,
                  output_size: int,
-                 ):
-        super().__init__()
+                 name: str = "nanni_cnn1"):
+        super().__init__(name=name)
+        self.sequence_length = sequence_length
+        self.hidden_size = hidden_size
+        self.output_size = output_size
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding='same')
         self.bn1 = nn.BatchNorm2d(16)
         self.dropout = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(16  * 4 * sequence_length, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.fc1 = nn.Linear(16  * 4 * sequence_length, self.hidden_size)
+        self.fc2 = nn.Linear(self.hidden_size, self.output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv1(x)
@@ -45,5 +50,29 @@ class nanni_cnn1(nn.Module):
          # softmax is applied to the output layer
          # to convert logits into probabilities
         return x
+        
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        config.update({
+            'sequence_length': self.sequence_length,
+            'hidden_size': self.hidden_size,
+            'output_size': self.output_size
+        })
+        return config
+    
+    @classmethod
+    def load(cls, path: str, map_location: Optional[str] = None) -> 'nanni_cnn1':
+        checkpoint = torch.load(path, map_location=map_location)
+        config = checkpoint['model_config']
+        
+        model = cls(
+            sequence_length=config['sequence_length'],
+            hidden_size=config['hidden_size'],
+            output_size=config['output_size'],
+            name=config.get('name', 'nanni_cnn1')
+        )
+        
+        model.load_state_dict(checkpoint['model_state_dict'])
+        return model
 
 
