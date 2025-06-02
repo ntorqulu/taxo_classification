@@ -1,0 +1,24 @@
+{
+    "taxo_path": "",
+    "max_rows": 10000,
+    "seed": 123,
+    "epochs": 50,
+    "batch_size": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 0,
+    "label_column_name": "order_name",
+    "k": null,
+    "bits": 0, 
+    "hidden_size": 8,
+    
+    "model_type": "nanni_cnn1",
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "by_step",
+    "every_n_epochs": 50,
+
+    "sequence_length": 313,
+    
+    "dropout": 0.5,
+    "use_batch_norm": true
+  }

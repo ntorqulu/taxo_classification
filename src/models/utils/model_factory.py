@@ -6,6 +6,7 @@ from models.architectures.basic_model import BasicTaxoModel
 from models.architectures.enhanced_mlp import EnhancedMLP
 from models.architectures.cnn_model import CNNModel
 from models.architectures.nanni2024 import nanni_cnn1
+from models.architectures.nanni2024 import nanni_cnn2
 
 def create_model(model_type: str, **kwargs) -> BaseModel:
     """
@@ -64,10 +65,20 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
         required_params = ['output_size']
         _check_required_params(required_params, kwargs)
         return nanni_cnn1(
-            sequence_length=kwargs.get('sequence_length', 320),
+            sequence_length=kwargs.get('sequence_length', 313),
             hidden_size=kwargs.get('hidden_size', 8),
             output_size=kwargs['output_size'],
             name=kwargs.get('name', 'nanni_cnn1')
+        )
+        
+    elif model_type == 'nanni_cnn2':
+        required_params = ['output_size']
+        _check_required_params(required_params, kwargs)
+        return nanni_cnn2(
+            sequence_length=kwargs.get('sequence_length', 313),
+            hidden_size=kwargs.get('hidden_size', 1024),
+            output_size=kwargs['output_size'],
+            name=kwargs.get('name', 'nanni_cnn2')
         )
         
     else:

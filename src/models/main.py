@@ -79,8 +79,12 @@ def run_experiment(hparams: dict) -> dict:
         model_params['dropout'] = hparams.get('dropout', 0.3)
     
     elif hparams.get('model_type') == 'nanni_cnn1':
-        model_params['sequence_length'] = hparams.get('sequence_length', 320)
+        model_params['sequence_length'] = hparams.get('sequence_length', 313)
         model_params['hidden_size'] = hparams.get('hidden_size', 8)
+    
+    elif hparams.get('model_type') == 'nanni_cnn2':
+        model_params['sequence_length'] = hparams.get('sequence_length', 313)
+        model_params['hidden_size'] = hparams.get('hidden_size', 1024)
     
     # Add experiment identifier to model name
     exp_id = hparams.get('experiment_id', time.strftime('%Y%m%d-%H%M%S'))
@@ -198,7 +202,7 @@ def main():
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Train taxonomy classification models')
     parser.add_argument('--config', type=str, default='hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1'], 
+    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2'], 
                        help='Model type to train')
     args = parser.parse_args()
     
