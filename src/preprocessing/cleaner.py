@@ -178,7 +178,7 @@ class TaxonomyDataCleaner:
         self.logger.info(f"Keeping {mask.sum()} of {len(df)} sequences after taxonomic completeness filter")
         return mask
     
-    def remove_duplicates(self, df: pd.DataFrame, method: str = 'sequence') -> pd.Series:
+    def remove_duplicates(self, df: pd.DataFrame, method: str = 'both') -> pd.Series:
         """
         Identify and filter duplicate records.
         
@@ -187,7 +187,7 @@ class TaxonomyDataCleaner:
         df : pandas.DataFrame
             DataFrame with sequence data
         method : str
-            Method for identifying duplicates: 'sequence', 'seqID', or 'both'
+            Method for identifying duplicates: 'sequence', 'scientific_name', or 'both'
             
         Returns:
         --------
@@ -199,12 +199,12 @@ class TaxonomyDataCleaner:
         if method == 'sequence':
             # Keep first occurrence of each sequence
             mask = ~df.duplicated(subset=['sequence'])
-        elif method == 'seqID':
+        elif method == 'scientific_name':
             # Keep first occurrence of each sequence ID
-            mask = ~df.duplicated(subset=['seqID'])
+            mask = ~df.duplicated(subset=['scientific_name'])
         elif method == 'both':
             # Keep first occurrence of each unique sequence and sequence ID combination
-            mask = ~df.duplicated(subset=['seqID', 'sequence'])
+            mask = ~df.duplicated(subset=['scientific_name', 'sequence'])
         else:
             self.logger.error(f"Invalid duplicate removal method: {method}. Using 'sequence'.")
             mask = ~df.duplicated(subset=['sequence'])
