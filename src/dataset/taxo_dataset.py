@@ -14,6 +14,7 @@ class TaxoDataset(Dataset):
     SEQUENCE_CHAR_DIFFERENT_VALUES = 4 # No commit
     SEQUENCE_LENGTH = 300 # No commit
     LABEL_ID_COLUMN_NAME = 'label_id'
+    DEFAULT_MAX_SEQUENCE_LEN = 9999999
 
     def __init__(self,
                  taxo_path: str,
@@ -21,14 +22,15 @@ class TaxoDataset(Dataset):
                  filters: dict[str, str] = None,
                  k: int = None,
                  bits: int = None,
+                 max_len_filter: int = DEFAULT_MAX_SEQUENCE_LEN,
                  ):
         super().__init__()
 
         if not filters:
             filters = {}
-        elif any(r not in TaxoDataset.FILTERS_COLUMN_NAMES for r in filters.keys()):
+        elif any(r not in TAXONOMY_LABELS for r in filters.keys()):
             raise ValueError(f"Unrecognized filter keys: {filters.keys()}")
-        if label_column_name not in self.FILTERS_COLUMN_NAMES:
+        if label_column_name not in TAXONOMY_LABELS:
             raise ValueError(f"Unrecognized label column name: {label_column_name}")
         if k is None and bits is None:
             raise ValueError(f"Must specify k or bits")
