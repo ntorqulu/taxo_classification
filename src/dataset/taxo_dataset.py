@@ -1,4 +1,3 @@
-import os
 import torch
 import pandas as pd
 from typing import Final
@@ -91,7 +90,6 @@ class TaxoDataset(Dataset):
 
     def _init_filter_indexes(self) -> list[int] | None:
         """
-        Initializes the list of indexes of the values for the filters
         Initializes the list of indexes for the instances that match the filters.
 
         Returns
