@@ -9,6 +9,8 @@ class CachedDataFrame:
     _k_encodings: dict[int, pd.DataFrame] = {}
     _bits_encodings: dict[int, pd.DataFrame] = {}
 
+    SEQUENCE_COLUMN_NAME = 'sequence'
+
     @classmethod
     def flush_encodings_cache(cls):
         for k in cls._k_encodings:

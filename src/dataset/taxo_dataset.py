@@ -9,15 +9,10 @@ from feature_extraction.main import SequenceCoder
 
 
 class TaxoDataset(Dataset):
-    FILTERS_COLUMN_NAMES: list[str] = [
-        'kingdom_name',
-        'phylum_name',
-        'class_name',
-        'order_name'
-    ]
     # Discared columns seqID,taxID,scientific_name
 
-    SEQUENCE_COLUMN_NAME = 'sequence'
+    SEQUENCE_CHAR_DIFFERENT_VALUES = 4 # No commit
+    SEQUENCE_LENGTH = 300 # No commit
     LABEL_ID_COLUMN_NAME = 'label_id'
 
     def __init__(self,
