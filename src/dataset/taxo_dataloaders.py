@@ -13,8 +13,15 @@ class TaxoDataLoaders:
                  max_rows: int | float = 1.,
                  k: int = None,
                  bits: int = None,
+                 max_len_filter: int | None = None,
                  ):
-        self.taxo_dataset = TaxoDataset(taxo_path=taxo_path, label_column_name=label_column_name, k=k, bits=bits)
+
+        self.taxo_dataset = TaxoDataset(taxo_path=taxo_path,
+                                        label_column_name=label_column_name,
+                                        k=k,
+                                        bits=bits,
+                                        max_len_filter=max_len_filter if max_len_filter is not None
+                                                                      else TaxoDataset.DEFAULT_MAX_SEQUENCE_LEN)
 
         max_rows = self._init_max_rows(max_rows)
         if max_rows <= len(self.taxo_dataset):
