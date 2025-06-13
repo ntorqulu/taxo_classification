@@ -46,7 +46,6 @@ class nanni_cnn1(BaseModel):
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
         x = self.fc2(x)
-        x = f.softmax(x, dim=1)
          # softmax is applied to the output layer
          # to convert logits into probabilities
         return x
@@ -105,7 +104,7 @@ class nanni_cnn2(BaseModel):
     def __init__(self,
                  sequence_length: int,
                  hidden_size: int = 1024,
-                 output_size: int,
+                 output_size: int = 16,
                  name: str = "nanni_cnn2"):
         super().__init__(name=name)
         self.sequence_length = sequence_length
@@ -115,7 +114,7 @@ class nanni_cnn2(BaseModel):
         self.conv2 = nn.Conv2d(16, 36, kernel_size=5, padding='same')
         self.pool = nn.MaxPool2d(kernel_size=2)
         self.dropout = nn.Dropout(0.2)
-        self.fc1 = nn.Linear(36 * 4/2 * (sequence_length // 2), self.hidden_size)
+        self.fc1 = nn.Linear(36 * 2 * (sequence_length // 2), self.hidden_size)
         self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.fc3 = nn.Linear(self.hidden_size, self.output_size)
 
@@ -133,7 +132,6 @@ class nanni_cnn2(BaseModel):
         x = self.fc2(x)
         x = f.relu(x)
         x = self.fc3(x)
-        x = f.softmax(x, dim=1)
         return x
         
     def get_config(self) -> Dict[str, Any]:

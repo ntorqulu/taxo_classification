@@ -160,6 +160,53 @@ class Trainer:
         return avg_loss, avg_accuracy
     
     @torch.no_grad()
+    def quick_evaluate(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Tuple[float, float]:
+        """
+        Quick evaluation without per-class metrics or visualizations.
+        
+        Args:
+            data_loader: DataLoader for validation/test data
+            epoch: Current epoch number
+            prefix: Prefix for TensorBoard logs
+            
+        Returns:
+            Tuple of (average loss, average accuracy)
+        """
+        self.model.eval()
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        
+        for data, target in data_loader:
+            data, target = data.to(self.device), target.to(self.device)
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
+                
+            # Forward pass
+            output = self.model(data)
+            
+            # Compute loss
+            loss = self.criterion(output, target.view(-1))
+            
+            # Track metrics
+            total_loss += loss.item()
+            pred = output.argmax(dim=1)
+            correct += pred.eq(target.view_as(pred)).sum().item()
+            total += target.size(0)
+            
+        # Compute averages
+        avg_loss = total_loss / len(data_loader)
+        avg_accuracy = correct / total
+        
+        # Log to TensorBoard
+        self.writer.add_scalar(f'Loss/{prefix}', avg_loss, epoch)
+        self.writer.add_scalar(f'Accuracy/{prefix}', avg_accuracy, epoch)
+        
+        info(f'{prefix.capitalize()} Epoch: {epoch} Loss: {avg_loss:.6f}, Acc: {100. * avg_accuracy:.2f}%')
+        
+        return avg_loss, avg_accuracy
+    
+    @torch.no_grad()
     def compute_per_class_metrics(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Dict[str, float]:
         """
         Compute and log metrics for each class individually.
@@ -587,12 +634,14 @@ class Trainer:
         self.writer.add_text(f"{prefix}_phylum_metrics", table, epoch)
         
     def train(self, 
-             train_loader: DataLoader,
-             val_loader: DataLoader,
-             test_loader: Optional[DataLoader] = None,
-             epochs: int = 10,
-             patience: int = 5,
-             save_best: bool = True) -> Dict[str, List[float]]:
+         train_loader: DataLoader,
+         val_loader: DataLoader,
+         test_loader: Optional[DataLoader] = None,
+         epochs: int = 10,
+         patience: int = 5,
+         save_best: bool = True,
+         fast_mode: bool = False,
+         eval_frequency: int = 1) -> Dict[str, List[float]]:
         """
         Train model for multiple epochs.
         
@@ -603,6 +652,8 @@ class Trainer:
             epochs: Number of epochs to train
             patience: Early stopping patience
             save_best: Whether to save best model
+            fast_mode: If True, use faster evaluation with minimal metrics
+            eval_frequency: How often to run detailed evaluation (epochs)
             
         Returns:
             Dictionary with training history
@@ -622,7 +673,7 @@ class Trainer:
         best_epoch = 0
         
         t0 = time.time()
-        info(f"Starting training for {epochs} epochs")
+        info(f"Starting training for {epochs} epochs in {'fast' if fast_mode else 'detailed'} mode")
         
         for epoch in range(1, epochs + 1):
             # Train
@@ -630,55 +681,72 @@ class Trainer:
             history['train_loss'].append(train_loss)
             history['train_acc'].append(train_acc)
             
-            # Calculate per-class metrics for training data (after train_epoch)
-            train_class_metrics = self.compute_per_class_metrics(train_loader, epoch, prefix='train')
-            history.setdefault('train_per_class_metrics', []).append(train_class_metrics)
-
-            # Log learning progress table for training data
-            self.log_learning_progress_table(train_class_metrics, epoch, prefix='train')
-
-            # Create training visualizations less frequently to avoid clutter
-            if epoch % 5 == 0 or epoch == 1 or epoch == epochs:
-                self.log_class_performance_chart(train_loader, epoch, prefix='train')
-                self.log_confusion_matrix(train_loader, epoch, prefix='train')
+            # Decide if we should run detailed evaluation in this epoch
+            run_detailed = (epoch % eval_frequency == 0 or epoch == 1 or epoch == epochs)
             
-            # Validate
-            val_loss, val_acc = self.evaluate(val_loader, epoch, prefix='val')
+            # Compute train metrics (more detailed if not in fast mode)
+            if not fast_mode and run_detailed:
+                train_class_metrics = self.compute_per_class_metrics(train_loader, epoch, prefix='train')
+                history.setdefault('train_per_class_metrics', []).append(train_class_metrics)
+                self.log_learning_progress_table(train_class_metrics, epoch, prefix='train')
+                
+                # Create visualizations less frequently
+                if epoch % (eval_frequency * 2) == 0 or epoch == 1 or epoch == epochs:
+                    self.log_class_performance_chart(train_loader, epoch, prefix='train')
+                    self.log_confusion_matrix(train_loader, epoch, prefix='train')
+            
+            # Validation - always needed for early stopping
+            if fast_mode and not run_detailed:
+                # Fast evaluation
+                val_loss, val_acc = self.quick_evaluate(val_loader, epoch, prefix='val')
+            else:
+                # Standard evaluation
+                val_loss, val_acc = self.evaluate(val_loader, epoch, prefix='val')
+                
             history['val_loss'].append(val_loss)
             history['val_acc'].append(val_acc)
             
-            # Calculate per-class metrics
-            val_class_metrics = self.compute_per_class_metrics(val_loader, epoch, prefix='val')
-            history['per_class_metrics'].append(val_class_metrics)
-            
-            # Log learning progress table
-            self.log_learning_progress_table(val_class_metrics, epoch, prefix='val')
-            
-            # Create phylum-specific visualizations (every few epochs to avoid clutter)
-            if epoch % 3 == 0 or epoch == 1 or epoch == epochs:
+            # Detailed validation metrics only if not in fast mode and on scheduled epochs
+            if not fast_mode and run_detailed:
+                # Calculate per-class metrics
+                val_class_metrics = self.compute_per_class_metrics(val_loader, epoch, prefix='val')
+                history['per_class_metrics'].append(val_class_metrics)
+                
+                # Log learning progress table
+                self.log_learning_progress_table(val_class_metrics, epoch, prefix='val')
+                
+                # Create visualizations
                 self.log_class_performance_chart(val_loader, epoch, prefix='val')
                 self.log_confusion_matrix(val_loader, epoch, prefix='val')
-                
+                    
                 # Plot evolution of phylum performance
-                if epoch >= 3:  # Only after we have some history
+                if epoch >= eval_frequency*2:
                     self.log_phylum_evolution_chart(history, epoch)
             
-            # Test if provided
+            # Test evaluation
             if test_loader is not None:
-                test_loss, test_acc = self.evaluate(test_loader, epoch, prefix='test')
-                history['test_loss'].append(test_loss)
-                history['test_acc'].append(test_acc)
-                
-                # Calculate per-class metrics on test set
-                test_class_metrics = self.compute_per_class_metrics(test_loader, epoch, prefix='test')
-                
-                # Log test metrics table
-                self.log_learning_progress_table(test_class_metrics, epoch, prefix='test')
-                
-                # Create test visualizations less frequently
-                if epoch % 5 == 0 or epoch == epochs:
-                    self.log_class_performance_chart(test_loader, epoch, prefix='test')
-                    self.log_confusion_matrix(test_loader, epoch, prefix='test')
+                if fast_mode:
+                    # In fast mode, evaluate test set only on final epoch
+                    if epoch == epochs or (patience_counter >= patience):
+                        test_loss, test_acc = self.quick_evaluate(test_loader, epoch, prefix='test')
+                        history['test_loss'].append(test_loss)
+                        history['test_acc'].append(test_acc)
+                elif run_detailed:
+                    # In detailed mode, evaluate test set on scheduled epochs
+                    test_loss, test_acc = self.evaluate(test_loader, epoch, prefix='test')
+                    history['test_loss'].append(test_loss)
+                    history['test_acc'].append(test_acc)
+                    
+                    # Calculate per-class metrics on test set
+                    test_class_metrics = self.compute_per_class_metrics(test_loader, epoch, prefix='test')
+                    
+                    # Log test metrics table
+                    self.log_learning_progress_table(test_class_metrics, epoch, prefix='test')
+                    
+                    # Create test visualizations
+                    if epoch % (eval_frequency * 2) == 0 or epoch == epochs:
+                        self.log_class_performance_chart(test_loader, epoch, prefix='test')
+                        self.log_confusion_matrix(test_loader, epoch, prefix='test')
             
             # Learning rate scheduler
             if self.scheduler is not None:
@@ -698,15 +766,16 @@ class Trainer:
             else:
                 patience_counter += 1
                 
-            # Save regular checkpoint
-            if epoch % 5 == 0:
+            # Save regular checkpoint (less frequently in fast mode)
+            checkpoint_freq = 10 if fast_mode else 5
+            if epoch % checkpoint_freq == 0:
                 self._save_checkpoint(epoch)
                 
             # Early stopping
             if patience_counter >= patience:
                 info(f"Early stopping at epoch {epoch}. Best epoch was {best_epoch}.")
                 break
-                
+                    
         # Training completed
         seconds = time.time() - t0
         minutes = int(seconds / 60)
@@ -723,15 +792,16 @@ class Trainer:
                 self.model.load_state_dict(checkpoint['model_state_dict'])
                 
             test_loss, test_acc = self.evaluate(test_loader, epochs, prefix='test')
-            test_class_metrics = self.compute_per_class_metrics(test_loader, epochs, prefix='final_test')
             
-            # Final visualizations
-            self.log_class_performance_chart(test_loader, epochs, prefix='final_test')
-            self.log_confusion_matrix(test_loader, epochs, prefix='final_test')
-            self.log_learning_progress_table(test_class_metrics, epochs, prefix='final_test')
-            
+            # Always do detailed metrics for final evaluation unless in fast mode
+            if not fast_mode:
+                test_class_metrics = self.compute_per_class_metrics(test_loader, epochs, prefix='final_test')
+                self.log_class_performance_chart(test_loader, epochs, prefix='final_test')
+                self.log_confusion_matrix(test_loader, epochs, prefix='final_test')
+                self.log_learning_progress_table(test_class_metrics, epochs, prefix='final_test')
+                
             info(f"Final test accuracy: {100. * test_acc:.2f}%")
-            
+                
         return history
     
     def _save_checkpoint(self, epoch: int, is_best: bool = False) -> None:

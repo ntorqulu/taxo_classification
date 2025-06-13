@@ -1,6 +1,6 @@
 {
   "taxo_path": "",
-  "max_rows": 10000,
+  "max_rows": 10000000,
   "seed": 123,
   "epochs": 40,
   "batch_size": 30,
@@ -25,5 +25,8 @@
   
   "kernel_sizes": [3, 5, 7],
   "num_filters": [64, 128, 256],
-  "fc_sizes": [512, 256]
+  "fc_sizes": [512, 256],
+
+  "fast_mode": true,
+  "eval_frequency": 5
 }
