@@ -37,19 +37,19 @@ class TaxoDataLoaders:
         self.train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
         self.eval_loader = torch.utils.data.DataLoader(
             dataset=eval_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
         self.test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
     def _init_max_rows(self, max_rows: int | float) -> int:

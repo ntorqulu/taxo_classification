@@ -55,7 +55,7 @@ def run_experiment(hparams: dict) -> dict:
         bits=hparams["bits"],
         batch_size=hparams["batch_size"],
         max_rows=hparams["max_rows"],
-        max_len_filter=hparams.get("max_len_filter", None)
+        seq_len_filter=hparams.get("seq_len_filter", None)
     )
     
     # Create model using factory
