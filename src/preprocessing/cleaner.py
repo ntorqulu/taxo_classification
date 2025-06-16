@@ -178,7 +178,7 @@ class TaxonomyDataCleaner:
         self.logger.info(f"Keeping {mask.sum()} of {len(df)} sequences after taxonomic completeness filter")
         return mask
     
-    def remove_duplicates(self, df: pd.DataFrame, method: str = 'both') -> pd.Series:
+    def remove_duplicates(self, df: pd.DataFrame, method: str = 'sequence') -> pd.Series:
         """
         Identify and filter duplicate records.
         
@@ -187,7 +187,7 @@ class TaxonomyDataCleaner:
         df : pandas.DataFrame
             DataFrame with sequence data
         method : str
-            Method for identifying duplicates: 'sequence', 'scientific_name', or 'both'
+            Method for identifying duplicates: 'sequence', 'seqID', or 'both'
             
         Returns:
         --------

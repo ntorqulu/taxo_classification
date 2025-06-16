@@ -1,5 +1,5 @@
 ####
-2025-06-16-15-34-12
+2025-06-16-18-51-00
 PARAMETERS:
 bait_fas: 
 cutadapt_path: 
@@ -20,23 +20,23 @@ vsearch_path:
 
 ####
 Make fasta file from input tsv
-Runtime: 45s 
+Runtime: 46s 
 
 ####
 e-PCR with cutadapt
-Runtime: 9s 
+Runtime: 10s 
 
 ####
 Make a fasta with sequences untrimmed by cutadapt
-Runtime: 5s 
+Runtime: 4s 
 
 ####
 Cluster trimmed sequneces or input bait_fas
-Runtime: 18s 
+Runtime: 19s 
 
 ####
 vsearch --usearch_global sequences against centroids
-Runtime: 1091s 
+Runtime: 1078s 
 
 ####
 Trim usearch_global hits
@@ -52,4 +52,4 @@ Runtime: 94s
 6. Number of sequences untrimmed after usearch_global: 90857
 7. Total number of trimmed sequences: 3163643
 8. Total number of untrimmed sequences: 90857
-Total runtime: 1262 s
+Total runtime: 1251 s
