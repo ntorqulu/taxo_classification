@@ -44,7 +44,6 @@ class SequenceFormatter:
         
         # Create directories if they don't exist
         os.makedirs(self.raw_data_dir, exist_ok=True)
-        os.makedirs(self.interim_data_dir, exist_ok=True)
         os.makedirs(self.processed_data_dir, exist_ok=True)
         
         # Setup logging

@@ -34,7 +34,6 @@ class TaxonomyDataFilter:
         
         # Create directories if they don't exist
         os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs(self.filtered_data_dir, exist_ok=True)
         
         # Setup logging
         self.logger = logger or logging.getLogger(__name__)
@@ -271,5 +270,7 @@ if __name__ == "__main__":
     
     # store the cleaned data
     hierarchical_dataset.to_csv("data/processed/hierarchical_dataset_cleaned.csv", index=False)
+    
+        
     
         
