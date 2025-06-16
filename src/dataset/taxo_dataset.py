@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.parquet_builder import ParquetBuilder
+from dataset.utils import info
 from feature_extraction.main import SequenceCoder
 from constants.taxonomy_labels import TAXONOMY_LABELS
 
@@ -15,7 +16,6 @@ class TaxoDataset(Dataset):
     SEQUENCE_CHAR_DIFFERENT_VALUES = 4 # No commit
     SEQUENCE_LENGTH = 300 # No commit
     LABEL_ID_COLUMN_NAME = 'label_id'
-    DEFAULT_MAX_SEQUENCE_LEN = 9999999
 
     def __init__(self,
                  taxo_path: str,
@@ -23,7 +23,7 @@ class TaxoDataset(Dataset):
                  filters: dict[str, str | list[str]] = None,
                  k: int = None,
                  bits: int = None,
-                 max_len_filter: int = DEFAULT_MAX_SEQUENCE_LEN,
+                 seq_len_filter: int | None = None,
                  ):
         """
         Parameters
@@ -44,8 +44,11 @@ class TaxoDataset(Dataset):
         bits: int
             bits for bit encoding. If bits is specified, k must be None.
 
-        max_len_filter: int
-            Filter sequences that are longer than this value.
+        seq_len_filter: int | None
+            Filter sequences with the exact length.
+
+        log_stats: bool
+            Show some statss about dataset
         """
         super().__init__()
 
@@ -65,15 +68,15 @@ class TaxoDataset(Dataset):
             raise ValueError(f"You only can specify k and bits, not both: {k=} {bits=}")
         if any(not isinstance(f, str) for f in filters.values()):
             raise NotImplementedError(f"Only strings are allowed as filter values")
-        if max_len_filter < 0:
-            raise ValueError(f"max_sequence_len must be positive: {max_len_filter}")
+        if seq_len_filter is not None and seq_len_filter <= 0:
+            raise ValueError(f"seq_len_filter must be positive: {seq_len_filter}")
 
         self.taxo_path: str = taxo_path
         self.filters: dict[str, str] = filters
         self.label_column_name: str = label_column_name
         self.k: int | None = k
         self.bits: int | None = bits
-        self.max_len_filter: int = max_len_filter
+        self.seq_len_filter: int = seq_len_filter
 
         # DataFrame with the data, but without the encodings.
         self._df: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.taxo_path)
@@ -88,6 +91,7 @@ class TaxoDataset(Dataset):
         # Dictionary with the mapping between label strings and their assigned IDs.
         self._labels_ids: dict[str, int] = self._init_labels_ids()
 
+
     def _init_filter_indexes(self) -> list[int] | None:
         """
         Initializes the list of indexes for the instances that match the filters.
@@ -97,7 +101,7 @@ class TaxoDataset(Dataset):
         The list of indexes, or None if no filters applyied
         """
 
-        if not self.filters and self.max_len_filter == TaxoDataset.DEFAULT_MAX_SEQUENCE_LEN:
+        if not self.filters and self.seq_len_filter is None:
             return None
 
         mask = pd.Series(True, index=self._df.index)
@@ -112,8 +116,8 @@ class TaxoDataset(Dataset):
                 raise NotImplementedError(f"Value types not implemented: {value}")
 
         # Undate the mask with the maxiumn sequence length fitler
-        if self.max_len_filter < TaxoDataset.DEFAULT_MAX_SEQUENCE_LEN:
-            mask &= self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].str.len() <= self.max_len_filter
+        if self.seq_len_filter is not None:
+            mask &= self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].str.len() == self.seq_len_filter
 
         # Return a list with the indexes after applying the filters
         indexes = self._df[mask].index.tolist()

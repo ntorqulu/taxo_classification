@@ -59,16 +59,17 @@ def test_init_k_bits():
     with pytest.raises(ValueError):
         TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, bits=1)
 
-def test_init_max_len_filter():
+def test_init_seq_len_filter():
     with pytest.raises(ValueError):
-        TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, max_len_filter=-1)
+        TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=-1)
+
+    with pytest.raises(ValueError):
+        TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=0)
 
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
-    min_len = min([len(l) for l in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME]])
-    max_len = max([len(l) for l in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME]])
-    for l in range(min_len, max_len+1):
-        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, max_len_filter=l)
-        assert len(t) == len([t for t in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME] if len(t) <= l])
+    for l in range(CachedDataFrame.get_min_sequence_len(), CachedDataFrame.get_max_sequence_len()+1):
+        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=l)
+        assert len(t) == len([t for t in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME] if len(t) == l])
 
 def test_init_indexes_basic():
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
