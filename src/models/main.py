@@ -6,6 +6,8 @@ import json
 import os
 import argparse
 from torch.utils.tensorboard import SummaryWriter
+
+from dataset.cached_dataframe import CachedDataFrame
 from dataset.utils import info, get_default_dataset_path
 from dataset.taxo_dataloaders import TaxoDataLoaders
 from constants.taxonomy_labels import get_class_names
@@ -57,7 +59,15 @@ def run_experiment(hparams: dict) -> dict:
         max_rows=hparams["max_rows"],
         seq_len_filter=hparams.get("seq_len_filter", None)
     )
-    
+
+    info(f"Full dataset - {CachedDataFrame.get_length()}")
+    info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
+    info(f"Full dataset - Max sequence length: {CachedDataFrame.get_max_sequence_len()}")
+
+    info(f"Filtered dataset - {taxo_data_loaders.dataset_length}")
+    info(f"Filtered dataset - Min sequence length: {taxo_data_loaders.min_sequence_len}")
+    info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
+
     # Create model using factory
     model_params = {
         'input_size': taxo_data_loaders.data_length,
