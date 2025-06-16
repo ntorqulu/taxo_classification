@@ -135,6 +135,14 @@ def test_len():
     # Tested on other tests
     pass
 
+def test_min_max_sequencelen():
+    range_min_max = range(CachedDataFrame.get_min_sequence_len(), CachedDataFrame.get_max_sequence_len()+1)
+    for seq_len_filter in [None] + list(range_min_max):
+        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=seq_len_filter)
+        min_seq = min(len(t.get_sequence(idx)) for idx in range(0, len(t)))
+        max_seq = max(len(t.get_sequence(idx)) for idx in range(0, len(t)))
+        assert t.min_sequence_len == min_seq, f"{t.min_sequence_len} != {min_seq}"
+        assert t.max_sequence_len == max_seq, f"{t.max_sequence_len} != {max_seq}"
 
 def test_getitem_k():
     for k in ParquetBuilder.KMERS_SIZES:

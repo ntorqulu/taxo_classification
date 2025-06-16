@@ -249,3 +249,67 @@ class TaxoDataset(Dataset):
         label = torch.tensor([label], dtype=torch.long).view(-1)
 
         return encoding, label
+
+    def get_sequence(self, idx: int) -> str:
+        """
+        Get the sequence at the specified index.
+
+        Parameters
+        ----------
+        idx:
+            Index of the sequence to retrieve.
+
+        Returns
+        -------
+        Sequence at the specified index.
+
+        Raises
+        ------
+        IndexError
+            If the provided index is negative or exceeds the maximum allowed
+            index of the dataset.
+        """
+        if idx < 0:
+            raise IndexError(f"Index {idx} is negative")
+        if idx >= len(self):
+            raise IndexError(f"Index {idx} is higher than the maximum number of rows ({len(self)})")
+
+        if self._filter_indexes:
+            idx = self._filter_indexes[idx]
+
+        sequence = self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]
+        assert isinstance(sequence, str), sequence
+
+        return sequence
+
+    @property
+    def min_sequence_len(self) -> int:
+        """
+        Gets the minimum sequence length.
+
+        Returns
+        -------
+        The minimum sequence length.
+        """
+        if self._filter_indexes:
+            min_len = min(len(self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]) for idx in self._filter_indexes)
+        else:
+            min_len = self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].astype(str).str.len().min()
+
+        return min_len
+
+    @property
+    def max_sequence_len(self) -> int:
+        """
+        Gets the maximum sequence length.
+
+        Returns
+        -------
+        The maximum sequence length.
+        """
+        if self._filter_indexes:
+            max_len = max(len(self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]) for idx in self._filter_indexes)
+        else:
+            max_len = self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].astype(str).str.len().max()
+
+        return max_len
