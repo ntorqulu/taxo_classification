@@ -2,6 +2,7 @@
 # than 299 characters, create all the possible combinations by taking the inner sequence 
 # by sliding one position at a time. For each new combination, keep the id label withan extra _n being n the number of the sequence
 import pandas as pd
+from dataset.parquet_builder import ParquetBuilder
 
 def slide_db(df: pd.DataFrame, window_size: int = 300) -> pd.DataFrame:
     """
@@ -40,3 +41,7 @@ if __name__ == "__main__":
     result_df = result_df.drop_duplicates(subset=['sequence', 'scientific_name'], keep='first')
 
     result_df.to_csv('data/slided_data/database.csv')
+
+    p = ParquetBuilder(csv_path='data/slided_data/database.csv',)
+    p.create_parquets(parallelize=False) # With parallelize=False, it takes less than 20 minutes.
+    p.show_info_parquets()
