@@ -86,3 +86,16 @@ class CachedDataFrame:
             df = cls._get_encodings_df(parquet_path, k, bits)
         assert df is not None
         return df
+
+    @classmethod
+    def get_length(cls) -> int:
+        return len(cls._df)
+
+    @classmethod
+    def get_min_sequence_len(cls) -> int:
+        return cls._df[cls.SEQUENCE_COLUMN_NAME].astype(str).str.len().min()
+
+    @classmethod
+    def get_max_sequence_len(cls) -> int:
+        return cls._df[cls.SEQUENCE_COLUMN_NAME].astype(str).str.len().max()
+
