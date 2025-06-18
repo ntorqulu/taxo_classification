@@ -219,7 +219,7 @@ if __name__ == "__main__":
                 print(f"Predicted taxonomic order: {result['predicted_class']}")
                 print(f"Confidence: {result['confidence']:.4f} ({result['confidence']*100:.2f}%)")
                 
-                print(f"\n📊 Top 3 Predictions:")
+                print(f"Top 3 Predictions:")
                 for j, pred in enumerate(result['top_predictions'], 1):
                     print(f"{j}. {pred['class']}: {pred['probability']:.4f} ({pred['probability']*100:.2f}%)")
     
