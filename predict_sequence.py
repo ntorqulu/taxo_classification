@@ -232,11 +232,11 @@ if __name__ == "__main__":
             if 'traceback' in result:
                 print(f"Traceback:\n{result['traceback']}")
         else:
-            print(f"\n🧬 Sequence Prediction Results:")
+            print(f"\nSequence Prediction Results:")
             print(f"Sequence length: {result['sequence_length']}")
             print(f"Predicted taxonomic order: {result['predicted_class']}")
             print(f"Confidence: {result['confidence']:.4f} ({result['confidence']*100:.2f}%)")
             
-            print(f"\n📊 Top 3 Predictions:")
+            print(f"\nTop 3 Predictions:")
             for i, pred in enumerate(result['top_predictions'], 1):
                 print(f"{i}. {pred['class']}: {pred['probability']:.4f} ({pred['probability']*100:.2f}%)")
