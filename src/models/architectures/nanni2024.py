@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as f # add import torch.nn.functional
 from networkx import config
 
 from models.architectures.base_model import BaseModel
@@ -43,7 +44,7 @@ class nanni_cnn1(BaseModel):
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
         x = self.fc2(x)
-        x = f.softmax(x, dim=1)
+        # Remove softmax from forward pass (let loss function handle it)
         # softmax is applied to the output layer
         # to convert logits into probabilities
         return x
@@ -107,7 +108,12 @@ class nanni_cnn2(BaseModel):
         self.conv2 = nn.Conv2d(16, 36, kernel_size=5, padding="same")
         self.pool = nn.MaxPool2d(kernel_size=2)
         self.dropout = nn.Dropout(0.2)
-        self.fc1 = nn.Linear(36 * 4 / 2 * (sequence_length // 2), self.hidden_size)
+        # FIXED: Calculate the correct input size for fc1
+        # After conv layers: 4 x sequence_length
+        # After pooling: 2 x (sequence_length // 2)
+        # With 36 channels: 36 * 2 * (sequence_length // 2)
+        fc1_input_size = 36 * 2 * (sequence_length // 2)
+        self.fc1 = nn.Linear(fc1_input_size, self.hidden_size)
         self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.fc3 = nn.Linear(self.hidden_size, self.output_size)
 
@@ -125,7 +131,7 @@ class nanni_cnn2(BaseModel):
         x = self.fc2(x)
         x = f.relu(x)
         x = self.fc3(x)
-        x = f.softmax(x, dim=1)
+        # Remove softmax from forward pass
         return x
 
     def get_config(self) -> Dict[str, Any]:
@@ -192,7 +198,7 @@ class nanni_att(BaseModel):
     def __init__(
         self,
         sequence_length: int,
-        output_size=int,
+        output_size = int,
         num_heads: int = 8,
         embed_dim: int = 64,
         hidden_size: int = 100,
@@ -230,7 +236,7 @@ class nanni_att(BaseModel):
         x = self.batch_norm(x)
         x = torch.mean(x, dim=2)
         x = self.fc(x)
-        x = self.softmax(x)
+        # Remove softmax from forward pass
         return x
 
     def get_config(self) -> Dict[str, Any]:

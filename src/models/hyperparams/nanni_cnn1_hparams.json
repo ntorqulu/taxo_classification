@@ -1,8 +1,8 @@
 {
     "taxo_path": "",
-    "max_rows": 10000,
+    "max_rows": 1000000,
     "seed": 123,
-    "epochs": 50,
+    "epochs": 15,
     "batch_size": 30,
     "learning_rate": 0.001,
     "weight_decay": 0,
@@ -17,8 +17,11 @@
     "scheduler": "by_step",
     "every_n_epochs": 50,
 
-    "sequence_length": 313,
+    "seq_len_filter": 313,
     
     "dropout": 0.5,
-    "use_batch_norm": true
+    "use_batch_norm": true,
+    "fast_mode": true,
+    "eval_frequency": 5
+
   }
