@@ -2,10 +2,15 @@ import argparse
 import json
 import os
 import time
-
-import numpy as np
 import torch
 import torch.nn as nn
+import numpy as np
+import json
+import os
+import argparse
+
+from torch.utils.tensorboard import SummaryWriter
+from dataset.cached_dataframe import CachedDataFrame
 from constants.taxonomy_labels import get_class_names
 from dataset.taxo_dataloaders import TaxoDataLoaders
 from dataset.utils import get_default_dataset_path, info
@@ -59,8 +64,17 @@ def run_experiment(hparams: dict) -> dict:
         bits=hparams["bits"],
         batch_size=hparams["batch_size"],
         max_rows=hparams["max_rows"],
+        seq_len_filter=hparams.get("seq_len_filter", None)
     )
 
+    info(f"Full dataset - {CachedDataFrame.get_length()}")
+    info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
+    info(f"Full dataset - Max sequence length: {CachedDataFrame.get_max_sequence_len()}")
+
+    info(f"Filtered dataset - {taxo_data_loaders.dataset_length}")
+    info(f"Filtered dataset - Min sequence length: {taxo_data_loaders.min_sequence_len}")
+    info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
+    
     # Create model using factory
     model_params = {
         "input_size": taxo_data_loaders.data_length,
@@ -177,9 +191,11 @@ def run_experiment(hparams: dict) -> dict:
         train_loader=taxo_data_loaders.train_loader,
         val_loader=taxo_data_loaders.eval_loader,
         test_loader=taxo_data_loaders.test_loader,
-        epochs=hparams.get("epochs", 15),
-        patience=hparams.get("patience", 5),
+        epochs=hparams.get('epochs', 15),
+        patience=hparams.get('patience', 5),
         save_best=True,
+        fast_mode=hparams.get('fast_mode', False),
+        eval_frequency=hparams.get('eval_frequency', 1)
     )
 
     return {"model": model, "history": history, "run_name": run_name}
@@ -205,6 +221,7 @@ def main():
     parser.add_argument(
         "--config", type=str, default="nanni_att_hparams.json", help="Path to hyperparameters JSON file"
     )
+    #parser.add_argument('--config', type=str, default='kmer_hparams.json', help='Path to hyperparameters JSON file')
     parser.add_argument(
         "--model_type",
         type=str,
@@ -212,6 +229,9 @@ def main():
         default="nanni_att",
         help="Model type to train",
     )
+    #parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn'], help='Model type to train')
+    parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
+    parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
     args = parser.parse_args()
 
     # Load hyperparameters
@@ -220,8 +240,16 @@ def main():
 
     # Override with command line arguments if provided
     if args.model_type:
-        hparams["model_type"] = args.model_type
-
+        hparams['model_type'] = args.model_type
+    
+    if args.fast:
+        hparams['fast_mode'] = True
+        info("Fast evaluation mode enabled")
+    
+    if args.eval_freq != 1:
+        hparams['eval_frequency'] = args.eval_freq
+        info(f"Detailed evaluation will run every {args.eval_freq} epochs")
+        
     # Set default dataset path if not provided
     if hparams["taxo_path"] == "":
         hparams["taxo_path"] = get_default_dataset_path()

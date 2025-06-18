@@ -1,40 +1,62 @@
-import os
 import torch
 import pandas as pd
-import numpy as np
+from typing import Final
 from torch.utils.data import Dataset
+
 from dataset.cached_dataframe import CachedDataFrame
-from dataset.utils import info
 from dataset.parquet_builder import ParquetBuilder
+from dataset.utils import info
 from feature_extraction.main import SequenceCoder
+from constants.taxonomy_labels import TAXONOMY_LABELS
 
 
 class TaxoDataset(Dataset):
-    FILTERS_COLUMN_NAMES: list[str] = [
-        'kingdom_name',
-        'phylum_name',
-        'class_name',
-        'order_name'
-    ]
     # Discared columns seqID,taxID,scientific_name
 
-    SEQUENCE_COLUMN_NAME = 'sequence'
+    SEQUENCE_CHAR_DIFFERENT_VALUES = 4 # No commit
+    SEQUENCE_LENGTH = 300 # No commit
     LABEL_ID_COLUMN_NAME = 'label_id'
 
     def __init__(self,
                  taxo_path: str,
                  label_column_name: str,
-                 filters: dict[str, str] = None,
+                 filters: dict[str, str | list[str]] = None,
                  k: int = None,
                  bits: int = None,
+                 seq_len_filter: int | None = None,
                  ):
+        """
+        Parameters
+        ----------
+        taxo_path: str
+            Path of the dataset to be loaded
+
+        label_column_name: str
+            Name of the column that contains the labels.
+
+        filters: dict[str, str | list[str]]
+            Dictionary of column_names with the values of the column to filter by. The filter
+            values can be strings or lists of strings.
+
+        k: int
+            k-mer size. If k is specified, bits must be None.
+
+        bits: int
+            bits for bit encoding. If bits is specified, k must be None.
+
+        seq_len_filter: int | None
+            Filter sequences with the exact length.
+
+        log_stats: bool
+            Show some statss about dataset
+        """
         super().__init__()
 
         if not filters:
             filters = {}
-        elif any(r not in TaxoDataset.FILTERS_COLUMN_NAMES for r in filters.keys()):
+        elif any(r not in TAXONOMY_LABELS for r in filters.keys()):
             raise ValueError(f"Unrecognized filter keys: {filters.keys()}")
-        if label_column_name not in self.FILTERS_COLUMN_NAMES:
+        if label_column_name not in TAXONOMY_LABELS:
             raise ValueError(f"Unrecognized label column name: {label_column_name}")
         if k is None and bits is None:
             raise ValueError(f"Must specify k or bits")
@@ -46,95 +68,248 @@ class TaxoDataset(Dataset):
             raise ValueError(f"You only can specify k and bits, not both: {k=} {bits=}")
         if any(not isinstance(f, str) for f in filters.values()):
             raise NotImplementedError(f"Only strings are allowed as filter values")
+        if seq_len_filter is not None and seq_len_filter <= 0:
+            raise ValueError(f"seq_len_filter must be positive: {seq_len_filter}")
 
         self.taxo_path: str = taxo_path
         self.filters: dict[str, str] = filters
         self.label_column_name: str = label_column_name
         self.k: int | None = k
         self.bits: int | None = bits
-        self.df: pd.DataFrame = CachedDataFrame.get_data_frame(self.taxo_path)
-        self.df_encoding: pd.DataFrame = CachedDataFrame.get_data_frame(self.taxo_path, k=self.k, bits=self.bits)
-        self.indexes: list[int] | None = self._init_indexes()
-        self.labels_ids: dict[str, int] = self._init_labels_ids()
-        if bits is not None and bits == 0:
-            self.df = self.df[self.df['seqID'].isin(self.df_encoding['seqID'])]
-            # reindex the DataFrame to avoid issues with the indexes
-            self.df = self.df.reset_index(drop=True)
-            
+        self.seq_len_filter: int = seq_len_filter
 
-    def _init_indexes(self) -> list[int] | None:
+        # DataFrame with the data, but without the encodings.
+        self._df: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.taxo_path)
+
+        # DataFrame with the encodings
+        self._df_encoding: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.taxo_path, k=self.k, bits=self.bits)
+
+        # Indexes of the final rows after applying both the filter and max_len_filter, if specified.
+        # It is None if no index is applied, meaning all rows are included.
+        self._filter_indexes: list[int] | None = self._init_filter_indexes()
+
+        # Dictionary with the mapping between label strings and their assigned IDs.
+        self._labels_ids: dict[str, int] = self._init_labels_ids()
+
+
+    def _init_filter_indexes(self) -> list[int] | None:
         """
-        Initializes the list of indexes of the values for the filters
+        Initializes the list of indexes for the instances that match the filters.
+
         Returns
         -------
-        The list of indexes or None if no filters
+        The list of indexes, or None if no filters applyied
         """
-        if not self.filters:
+
+        if not self.filters and self.seq_len_filter is None:
             return None
 
-        missing = set(self.filters.keys()) - set(self.df.columns) # TODO: AIxò cal?
-        if missing:
-            raise ValueError(f"Unrecognized filter key(s): {', '.join(missing)} (column(s) do not exist)")
+        mask = pd.Series(True, index=self._df.index)
 
-        mask = pd.Series(True, index=self.df.index)
-        for colum_name, values in self.filters.items():
-            mask &= self.df[colum_name].isin([values])
-        indexes = self.df[mask].index.tolist()
+        # Update the mask applying the filters
+        for columm_name, value in self.filters.items():
+            if isinstance(value, str):
+                mask &= self._df[columm_name] == value
+            elif isinstance(value, list):
+                mask &= self._df[columm_name].isin(value)
+            else:
+                raise NotImplementedError(f"Value types not implemented: {value}")
+
+        # Undate the mask with the maxiumn sequence length fitler
+        if self.seq_len_filter is not None:
+            mask &= self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].str.len() == self.seq_len_filter
+
+        # Return a list with the indexes after applying the filters
+        indexes = self._df[mask].index.tolist()
         return indexes
 
     def _init_labels_ids(self) -> dict[str, int]:
         """
-        Returns
-        -------
-        Returns an id for each label value of teh  current self.label_column_name
-        """
-        label_values: pd.Series
-        if self.indexes is None:
-            label_values = self.df[self.label_column_name]
-        else:
-            label_values = self.df.loc[self.indexes, self.label_column_name]
+        Assigns an id to each label value.
 
+        -------
+        Returns a dictionary with the mapping between label strings and their assigned IDs.
+        """
+
+        # Gets the label values depending on whether filters are applied or not.
+        if self._filter_indexes is None:
+            label_values = self._df[self.label_column_name]
+        else:
+            label_values = self._df.loc[self._filter_indexes, self.label_column_name]
+
+        # Obtain the unique valus
         unique_values: list[str] = label_values.unique().tolist()
+
+        # We sort the values to ensure that the IDs remain consistent when the labels are the same.
+        unique_values = sorted(unique_values)
+
+        # Assign the ids
         label_ids = {l[1]: l[0] for l in enumerate(unique_values)}
-        info(f"There is {len(label_ids)} labels available.")
+        # info(f"There is {len(label_ids)} labels available.")
 
         return label_ids
 
     @property
     def num_labels(self) -> int:
-        return len(self.labels_ids)
+        """
+        Gets the number of unique labels.
+
+        Returns
+        -------
+        int
+            The count of unique labels.
+        """
+        return len(self._labels_ids)
+
+    @property
+    def labels_names(self) -> list[str]:
+        """
+        Property to retrieves the names of labels
+
+        Returns
+        -------
+        list of str
+            A list containing the names of all labels.
+
+        """
+        return list(self._labels_ids.keys())
+
+    @property
+    def labels_ids(self) -> list[int]:
+        """
+        Property to retrieve the list of assigned label identifiers.
+
+        Returns
+        -------
+        list of str
+            A list containing all label identifiers present in the `_labels_ids`
+            dictionary.
+        """
+        return list(self._labels_ids.values())
+
+    def __len__(self) -> int:
+        """
+        The length of the dataset depends on whether filters are applied or not.
+
+        Returns
+        -------
+        Number of rows in the dataset
+        """
+        if self._filter_indexes:
+            l = len(self._filter_indexes)
+        else:
+            l = len(self._df)
+        return l
 
     @property
     def data_length(self) -> int:
-        return len(self.df_encoding.iloc[0, 0]) # TODO: Sempre és la mateixa mida?
-
-    def __len__(self) -> int:
-        if self.indexes:
-            l = len(self.indexes)
-        else:
-            l = len(self.df)
-        return l
+        return len(self._df_encoding.iloc[0, 0]) # TODO: Sempre és la mateixa mida?
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Retrieves an item at the specified index and returns the corresponding
+        tensor data and label.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the item to be retrieved.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            A tuple where the first element is a tensor of the encoding data at
+            the specified index, and the second element is a tensor containing
+            the label associated with the data.
+
+        Raises
+        ------
+        IndexError
+            If the provided index is negative or exceeds the maximum allowed
+            index of the dataset.
+        """
+
         if idx < 0:
             raise IndexError(f"Index {idx} is negative")
         if idx >= len(self):
             raise IndexError(f"Index {idx} is higher than the maximum number of rows ({len(self)})")
 
-        if self.indexes:
-            idx = self.indexes[idx]
+        # Get the row index for the whole subset
+        if self._filter_indexes:
+            idx = self._filter_indexes[idx]
 
-        label_row = self.df.iloc[idx]
+        # Gete the encoding value to return
+        encoding = self._df_encoding.iloc[idx, 0]
+        encoding = torch.tensor(encoding, dtype=torch.float32)
+
+        # Get the label id as a tensor
+        label_row = self._df.iloc[idx]
         label = label_row[self.label_column_name]
-        label = self.labels_ids[label]
+        label = self._labels_ids[label]
         label = torch.tensor([label], dtype=torch.long).view(-1)
 
-        if self.bits is not None and self.bits == 0:
-            # If bits is 0, we are using a 4-row matrix encoding
-            encoding = np.stack(self.df_encoding.iloc[idx, 1:].values)
-            encoding = torch.tensor(encoding, dtype=torch.float32)
-        else:
-            encoding = self.df_encoding.iloc[idx, 0]
-            encoding = torch.tensor(encoding, dtype=torch.float32)
-
         return encoding, label
+
+    def get_sequence(self, idx: int) -> str:
+        """
+        Get the sequence at the specified index.
+
+        Parameters
+        ----------
+        idx:
+            Index of the sequence to retrieve.
+
+        Returns
+        -------
+        Sequence at the specified index.
+
+        Raises
+        ------
+        IndexError
+            If the provided index is negative or exceeds the maximum allowed
+            index of the dataset.
+        """
+        if idx < 0:
+            raise IndexError(f"Index {idx} is negative")
+        if idx >= len(self):
+            raise IndexError(f"Index {idx} is higher than the maximum number of rows ({len(self)})")
+
+        if self._filter_indexes:
+            idx = self._filter_indexes[idx]
+
+        sequence = self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]
+        assert isinstance(sequence, str), sequence
+
+        return sequence
+
+    @property
+    def min_sequence_len(self) -> int:
+        """
+        Gets the minimum sequence length.
+
+        Returns
+        -------
+        The minimum sequence length.
+        """
+        if self._filter_indexes:
+            min_len = min(len(self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]) for idx in self._filter_indexes)
+        else:
+            min_len = self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].astype(str).str.len().min()
+
+        return min_len
+
+    @property
+    def max_sequence_len(self) -> int:
+        """
+        Gets the maximum sequence length.
+
+        Returns
+        -------
+        The maximum sequence length.
+        """
+        if self._filter_indexes:
+            max_len = max(len(self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]) for idx in self._filter_indexes)
+        else:
+            max_len = self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].astype(str).str.len().max()
+
+        return max_len

@@ -1,12 +1,15 @@
 import pytest
 from torch import Tensor
-from feature_extraction.main import SequenceCoder
+
+from constants.taxonomy_labels import TAXONOMY_LABELS
+from dataset.parquet_builder import ParquetBuilder
 from dataset.taxo_dataset import TaxoDataset
 from dataset.utils import get_default_dataset_path
-from dataset.parquet_builder import ParquetBuilder
+from feature_extraction.main import SequenceCoder
+from dataset.cached_dataframe import CachedDataFrame
 
 path = get_default_dataset_path()
-test_label_column_name = TaxoDataset.FILTERS_COLUMN_NAMES[0]
+test_label_column_name = list(TAXONOMY_LABELS.keys())[0]
 test_filter_key = test_label_column_name
 sequencecoder = SequenceCoder()
 
@@ -15,7 +18,7 @@ def test_init_label_column_name():
     with pytest.raises(ValueError):
         TaxoDataset(taxo_path=path, label_column_name="non_existent_column", k=1)
 
-    for label_column_name in TaxoDataset.FILTERS_COLUMN_NAMES:
+    for label_column_name in TAXONOMY_LABELS:
         TaxoDataset(taxo_path=path, label_column_name=label_column_name, k=1)
 
 
@@ -29,7 +32,7 @@ def test_init_filters():
                     filters={test_filter_key:["xx"]})
 
     TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1,
-                filters={l:"x" for l in TaxoDataset.FILTERS_COLUMN_NAMES})
+                filters={l:"x" for l in TAXONOMY_LABELS})
 
 
 def test_init_k():
@@ -56,58 +59,69 @@ def test_init_k_bits():
     with pytest.raises(ValueError):
         TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, bits=1)
 
+def test_init_seq_len_filter():
+    with pytest.raises(ValueError):
+        TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=-1)
+
+    with pytest.raises(ValueError):
+        TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=0)
+
+    t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
+    for l in range(CachedDataFrame.get_min_sequence_len(), CachedDataFrame.get_max_sequence_len()+1):
+        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=l)
+        assert len(t) == len([t for t in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME] if len(t) == l])
 
 def test_init_indexes_basic():
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
-    assert t.indexes is None
+    assert t._filter_indexes is None
 
 
 def test_init_indexes_one_column():
     # Test all filters with all the values
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
 
-    for column_name in TaxoDataset.FILTERS_COLUMN_NAMES:
-        for value in t.df[column_name].unique():
+    for column_name in TAXONOMY_LABELS:
+        for value in t._df[column_name].unique():
             t:TaxoDataset
             t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1,
                             filters={column_name: value})
-            assert t.indexes is not None
-            assert (t.df[column_name] == value).sum() == len(t.indexes), f"{column_name}={value}"
+            assert t._filter_indexes is not None
+            assert (t._df[column_name] == value).sum() == len(t._filter_indexes), f"{column_name}={value}"
 
 
 def test_init_indexes_multiple_columns():
     # Test all columns with the first value
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
 
-    df_tmp=t.df
+    df_tmp=t._df
     fiter_tmp = {}
-    for column_name in TaxoDataset.FILTERS_COLUMN_NAMES:
-        for value in t.df[column_name].unique():
+    for column_name in TAXONOMY_LABELS:
+        for value in t._df[column_name].unique():
             if column_name not in fiter_tmp:
-                fiter_tmp[column_name] = t.df[column_name][0]
+                fiter_tmp[column_name] = t._df[column_name][0]
                 df_tmp = df_tmp[df_tmp[column_name] == value]
                 t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1,
                                 filters=fiter_tmp)
-                assert t.indexes is not None
-                assert len(df_tmp) == len(t.indexes), f"{len(df_tmp) }={len(t.indexes)}"
+                assert t._filter_indexes is not None
+                assert len(df_tmp) == len(t._filter_indexes), f"{len(df_tmp) }={len(t._filter_indexes)}"
 
 
 def test_init_labels_ids_non_filtered():
-    for label_column_name in TaxoDataset.FILTERS_COLUMN_NAMES:
+    for label_column_name in TAXONOMY_LABELS:
         t = TaxoDataset(taxo_path=path, label_column_name=label_column_name, k=1)
-        assert len(t.labels_ids) == len(t.df[label_column_name].unique().tolist())
+        assert len(t.labels_ids) == len(t._df[label_column_name].unique().tolist())
         assert len(t.labels_ids) == t.num_labels
 
 
 def test_init_labels_ids_filtered():
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1)
 
-    for column_name in TaxoDataset.FILTERS_COLUMN_NAMES:
-        for value in t.df[column_name].unique():
+    for column_name in TAXONOMY_LABELS:
+        for value in t._df[column_name].unique():
             t:TaxoDataset
             t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1,
                             filters={column_name: value})
-            df_tmp = t.df[t.df[column_name] == value]
+            df_tmp = t._df[t._df[column_name] == value]
             assert len(t.labels_ids) == len(df_tmp[test_label_column_name].unique().tolist())
             assert len(t.labels_ids) == t.num_labels
 
@@ -117,24 +131,18 @@ def test_num_labels():
     pass
 
 
-def test_data_length():
-    # TODO
-    for k in ParquetBuilder.KMERS_SIZES:
-        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=k)
-        assert t.data_length == 4**k
-
-    for b in sequencecoder.bit_mapping:
-        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, bits=b)
-        # assert t.data_length == ???
-
-    t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, bits=0)
-    # assert t.data_length == ???
-
-
 def test_len():
     # Tested on other tests
     pass
 
+def test_min_max_sequencelen():
+    range_min_max = range(CachedDataFrame.get_min_sequence_len(), CachedDataFrame.get_max_sequence_len()+1)
+    for seq_len_filter in [None] + list(range_min_max):
+        t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, k=1, seq_len_filter=seq_len_filter)
+        min_seq = min(len(t.get_sequence(idx)) for idx in range(0, len(t)))
+        max_seq = max(len(t.get_sequence(idx)) for idx in range(0, len(t)))
+        assert t.min_sequence_len == min_seq, f"{t.min_sequence_len} != {min_seq}"
+        assert t.max_sequence_len == max_seq, f"{t.max_sequence_len} != {max_seq}"
 
 def test_getitem_k():
     for k in ParquetBuilder.KMERS_SIZES:
@@ -142,9 +150,6 @@ def test_getitem_k():
         d, v = t[1]
         assert isinstance(d, Tensor)
         assert isinstance(v, Tensor)
-        assert t.data_length == 4**k
-        # TODO:
-
 
 def test_getitem_bits():
     for b in sequencecoder.bit_mapping:
@@ -152,13 +157,8 @@ def test_getitem_bits():
         d, v = t[1]
         assert isinstance(d, Tensor)
         assert isinstance(v, Tensor)
-        # assert t.data_length == ???
-        # TODO:
 
     t = TaxoDataset(taxo_path=path, label_column_name=test_label_column_name, bits=0)
     d, v = t[1]
     assert isinstance(d, Tensor)
     assert isinstance(v, Tensor)
-    # assert t.data_length == ???
-    # TODO:
-
