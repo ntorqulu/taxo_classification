@@ -7,11 +7,11 @@
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
   "label_column_name": "order_name",
-  "k": 2,
-  "bits": null,
+  "k": null,
+  "bits": 4,
   "hidden_size": null,
   
-  "model_type": "basic",
+  "model_type": "enhanced_mlp",
   "optimizer": "adam",
   "use_scheduler": true,
   "scheduler": "plateau",
@@ -19,11 +19,15 @@
   "scheduler_factor": 0.5,
   "patience": 5,
   
-  "hidden_sizes": [256, 128],
-  "dropout": 0.2,
+  "hidden_sizes": [512, 256, 128],
+  "dropout": 0.3,
   "use_batch_norm": true,
   
   "kernel_sizes": [3, 5, 7],
   "num_filters": [64, 128, 256],
-  "fc_sizes": [512, 256]
+  "fc_sizes": [512, 256],
+
+  "seq_len_filter": 313,
+  "fast_mode": true,
+  "eval_frequency": 5
 }
