@@ -1,11 +1,10 @@
 import pytest
 from torch.utils.data import DataLoader
-
+from constants.taxonomy_labels import TAXONOMY_LABELS
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from dataset.taxo_dataset import TaxoDataset
 from dataset.utils import get_default_dataset_path
 
-test_label_column_name = TaxoDataset.FILTERS_COLUMN_NAMES[0]
+test_label_column_name = list(TAXONOMY_LABELS.keys())[0]
 
 def test_init():
     t = TaxoDataLoaders(taxo_path=get_default_dataset_path(), label_column_name=test_label_column_name,

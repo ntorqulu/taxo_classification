@@ -1,7 +1,14 @@
 """Constants used throughout the project."""
 
+TAXONOMY_LEVELS: list[str] = [
+    'kingdom_name',
+    'phylum_name',
+    'class_name',
+    'order_name'
+]
+
 # Taxonomy classification labels for different taxonomic levels
-TAXONOMY_LABELS = {
+TAXONOMY_LABELS: dict[str, list[str]]= {
     "kingdom_name": [
         'Metazoa', 'Viridiplantae', 'Fungi', 'Other_euk', 'No_euk'
     ],

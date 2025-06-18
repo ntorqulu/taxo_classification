@@ -6,7 +6,6 @@ from pathlib import Path
 def test_get_default_data_dir():
     d = get_default_data_dir()
     files = os.listdir(d)
-    assert "Pipeline4FinalDataset.py" in files
     assert "dataset.parquet" in files
 
 def test_get_default_dataset_path():

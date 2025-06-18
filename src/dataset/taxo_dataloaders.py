@@ -13,8 +13,14 @@ class TaxoDataLoaders:
                  max_rows: int | float = 1.,
                  k: int = None,
                  bits: int = None,
+                 seq_len_filter: int | None = None,
                  ):
-        self.taxo_dataset = TaxoDataset(taxo_path=taxo_path, label_column_name=label_column_name, k=k, bits=bits)
+
+        self.taxo_dataset = TaxoDataset(taxo_path=taxo_path,
+                                        label_column_name=label_column_name,
+                                        k=k,
+                                        bits=bits,
+                                        seq_len_filter=seq_len_filter)
 
         max_rows = self._init_max_rows(max_rows)
         if max_rows <= len(self.taxo_dataset):
@@ -31,19 +37,19 @@ class TaxoDataLoaders:
         self.train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
         self.eval_loader = torch.utils.data.DataLoader(
             dataset=eval_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
         self.test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset,
             batch_size=batch_size,
-            shuffle=False,  # We do the suffle on the DataLoader to increase performance
+            shuffle=True
         )
 
     def _init_max_rows(self, max_rows: int | float) -> int:
@@ -75,3 +81,17 @@ class TaxoDataLoaders:
     @property
     def data_length(self) -> int:
         return self.taxo_dataset.data_length
+
+    @property
+    def dataset_length(self) -> int:
+        return len(self.taxo_dataset)
+
+    @property
+    def min_sequence_len(self) -> int:
+        return self.taxo_dataset.min_sequence_len
+
+    @property
+    def max_sequence_len(self) -> int:
+        return self.taxo_dataset.max_sequence_len
+
+
