@@ -1,32 +1,34 @@
 import pytest
-from dataset.utils import *
 from pathlib import Path
+from dataset.utils import *
 
 
-def test_get_default_data_dir():
-    d = get_default_data_dir()
-    files = os.listdir(d)
-    assert "dataset.parquet" in files
+def test_get_default_data_path():
+    path = get_default_data_path()
+    path.exists()
 
-def test_get_default_dataset_path():
-    path = get_default_dataset_path()
-    assert os.path.exists(path) or os.path.exists(path+'.gz')
+def test_get_base_parquets_path():
+    path = get_base_parquets_path()
+    assert path.exists()
 
-def test_get_parquet_path():
-    data_dir = get_default_data_dir()
-    dataset_path = os.path.join(data_dir, "dataset.csv")
-    assert Path(get_parquet_path(dataset_path)).name == "dataset.parquet"
+def test_get_parquet_file_path():
+    base_parquet_path = get_base_parquets_path()
+    dirs = [d for d in base_parquet_path.iterdir() if d.is_dir()]
 
-    for k in range(1, 4+1):
-        path = get_parquet_path(dataset_path, k=k)
-        assert Path(path).name == f"dataset_kmer_{k}.parquet"
+    for parquets_path in dirs:
+        for k in range(1, 5+1):
+            path = get_parquet_file_path(parquets_path=parquets_path, k=k)
+            assert Path(path).name.endswith(f"_kmer_{k}.parquet"), Path(path).name
 
-    for b in range(1, 6+1):
-        path = get_parquet_path(dataset_path, bits=b)
-        assert Path(path).name == f"dataset_bits_{b}.parquet"
+        for b in range(1, 4+1):
+            path = get_parquet_file_path(parquets_path=parquets_path, bits=b)
+            assert Path(path).name.endswith(f"_bits_{b}.parquet"), Path(path).name
 
-    with pytest.raises(ValueError):
-        get_parquet_path(dataset_path, bits=1, k=1)
+        path = get_parquet_file_path(parquets_path=parquets_path, bits=0)
+        assert  Path(path).name.endswith("_4rowmatrix.parquet"), Path(path).name
+
+        with pytest.raises(ValueError):
+            get_parquet_file_path(parquets_path=parquets_path, bits=1, k=1)
 
 def test_encoding_column_name():
     with pytest.raises(ValueError):

@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 import sys
 import re
+from dataset.utils import info, get_base_parquets_path, encoding_column_name, DEFAULT_DATASET_NAME
 
 # Add the src directory to path to allow imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -17,7 +18,7 @@ class TestParquetContent(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Find parquet files in the project
-        self.data_dir = Path(__file__).resolve().parent.parent.parent.parent / "data"
+        self.data_dir = get_base_parquets_path()
         self.parquet_files = list(self.data_dir.glob("**/*.parquet"))
         
         info(f"Found {len(self.parquet_files)} parquet files for testing")

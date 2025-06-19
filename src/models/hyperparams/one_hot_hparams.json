@@ -1,5 +1,6 @@
 {
-  "taxo_path": "data/parquets/filtered_ranks/dataset.csv",
+  "parquets_path": "",
+  "dataset_name": "filtered_ranks",
   "max_rows": 10000,
   "seed": 123,
   "epochs": 40,

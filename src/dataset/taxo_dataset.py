@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import pandas as pd
 from typing import Final
@@ -18,7 +20,7 @@ class TaxoDataset(Dataset):
     LABEL_ID_COLUMN_NAME = 'label_id'
 
     def __init__(self,
-                 taxo_path: str,
+                 parquets_path: Path,
                  label_column_name: str,
                  filters: dict[str, str | list[str]] = None,
                  k: int = None,
@@ -28,8 +30,8 @@ class TaxoDataset(Dataset):
         """
         Parameters
         ----------
-        taxo_path: str
-            Path of the dataset to be loaded
+        parquets_path: Path
+            Path of the parquets to be loaded
 
         label_column_name: str
             Name of the column that contains the labels.
@@ -46,9 +48,6 @@ class TaxoDataset(Dataset):
 
         seq_len_filter: int | None
             Filter sequences with the exact length.
-
-        log_stats: bool
-            Show some statss about dataset
         """
         super().__init__()
 
@@ -71,7 +70,7 @@ class TaxoDataset(Dataset):
         if seq_len_filter is not None and seq_len_filter <= 0:
             raise ValueError(f"seq_len_filter must be positive: {seq_len_filter}")
 
-        self.taxo_path: str = taxo_path
+        self.parquet_path: Path = parquets_path
         self.filters: dict[str, str] = filters
         self.label_column_name: str = label_column_name
         self.k: int | None = k
@@ -79,10 +78,12 @@ class TaxoDataset(Dataset):
         self.seq_len_filter: int = seq_len_filter
 
         # DataFrame with the data, but without the encodings.
-        self._df: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.taxo_path)
+        self._df: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.parquet_path)
 
         # DataFrame with the encodings
-        self._df_encoding: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(self.taxo_path, k=self.k, bits=self.bits)
+        self._df_encoding: Final[pd.DataFrame] = CachedDataFrame.get_data_frame(parquets_path=self.parquet_path,
+                                                                                k=self.k,
+                                                                                bits=self.bits)
 
         # Indexes of the final rows after applying both the filter and max_len_filter, if specified.
         # It is None if no index is applied, meaning all rows are included.

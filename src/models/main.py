@@ -1,4 +1,6 @@
 import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -8,7 +10,7 @@ import argparse
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset.cached_dataframe import CachedDataFrame
-from dataset.utils import info, get_default_dataset_path
+from dataset.utils import info, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
 from constants.taxonomy_labels import get_class_names
 from models.utils.model_factory import create_model
@@ -49,9 +51,11 @@ def run_experiment(hparams: dict) -> dict:
     device = init_device(hparams.get('seed', 42))
     
     # Load data
-    taxo_path = hparams['taxo_path'] if hparams['taxo_path'] else get_default_dataset_path()
+    parquets_path = hparams['parquets_path'] if hparams['parquets_path'] else get_base_parquets_path()
+    dataset_name = hparams['dataset_name']
+
     taxo_data_loaders = TaxoDataLoaders(
-        taxo_path=taxo_path,
+        parquets_path=Path(parquets_path) / dataset_name,
         label_column_name=hparams["label_column_name"],
         k=hparams["k"],
         bits=hparams["bits"],
@@ -204,6 +208,7 @@ def main():
                        help='Model type to train')
     parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
     parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
+    parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
     args = parser.parse_args()
     
     # Load hyperparameters
@@ -224,9 +229,13 @@ def main():
         
         
     # Set default dataset path if not provided
-    if hparams['taxo_path'] == "":
-        hparams['taxo_path'] = get_default_dataset_path()
-        
+    if hparams['parquets_path'] == "":
+        hparams['parquets_path'] = get_base_parquets_path()
+
+    if args.dataset_name:
+        hparams['dataset_name'] = args.dataset_name
+
+
     # Track timing
     t0 = time.time()
     info("Starting")

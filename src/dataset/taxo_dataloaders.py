@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 from dataset.taxo_dataset import TaxoDataset
 from torch.utils.data import random_split, Subset, DataLoader
@@ -7,7 +9,7 @@ class TaxoDataLoaders:
     TRAIN_PCT = 0.8
     EVAL_PCT = 0.1
     def __init__(self,
-                 taxo_path: str,
+                 parquets_path: Path,
                  label_column_name: str,
                  batch_size: int,
                  max_rows: int | float = 1.,
@@ -16,7 +18,7 @@ class TaxoDataLoaders:
                  seq_len_filter: int | None = None,
                  ):
 
-        self.taxo_dataset = TaxoDataset(taxo_path=taxo_path,
+        self.taxo_dataset = TaxoDataset(parquets_path=parquets_path,
                                         label_column_name=label_column_name,
                                         k=k,
                                         bits=bits,

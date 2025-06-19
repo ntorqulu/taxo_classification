@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # Add the src directory to path to allow imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from dataset.utils import info, get_parquet_path, encoding_column_name
+from dataset.utils import info, get_parquet_file_path, encoding_column_name
 from dataset.cached_dataframe import CachedDataFrame
 
 class DatasetAnalyzer:
@@ -41,7 +41,7 @@ class DatasetAnalyzer:
         info(f"Detected {len(self.rank_columns)} taxonomic rank columns: {self.rank_columns}")
         
         # Check if parquet files exist
-        self.parquet_path = get_parquet_path(csv_path)
+        self.parquet_path = get_parquet_file_path(csv_path)
         if not os.path.exists(self.parquet_path):
             info(f"Warning: Main parquet file not found at {self.parquet_path}")
     
