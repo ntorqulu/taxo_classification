@@ -199,12 +199,12 @@ class TaxonomyDataCleaner:
         if method == 'sequence':
             # Keep first occurrence of each sequence
             mask = ~df.duplicated(subset=['sequence'])
-        elif method == 'seqID':
+        elif method == 'scientific_name':
             # Keep first occurrence of each sequence ID
-            mask = ~df.duplicated(subset=['seqID'])
+            mask = ~df.duplicated(subset=['scientific_name'])
         elif method == 'both':
             # Keep first occurrence of each unique sequence and sequence ID combination
-            mask = ~df.duplicated(subset=['seqID', 'sequence'])
+            mask = ~df.duplicated(subset=['scientific_name', 'sequence'])
         else:
             self.logger.error(f"Invalid duplicate removal method: {method}. Using 'sequence'.")
             mask = ~df.duplicated(subset=['sequence'])

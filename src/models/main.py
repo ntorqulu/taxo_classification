@@ -171,7 +171,9 @@ def run_experiment(hparams: dict) -> dict:
         test_loader=taxo_data_loaders.test_loader,
         epochs=hparams.get('epochs', 15),
         patience=hparams.get('patience', 5),
-        save_best=True
+        save_best=True,
+        fast_mode=hparams.get('fast_mode', False),
+        eval_frequency=hparams.get('eval_frequency', 1)
     )
     
     return {
@@ -200,6 +202,8 @@ def main():
     parser.add_argument('--config', type=str, default='kmer_hparams.json', help='Path to hyperparameters JSON file')
     parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn'], 
                        help='Model type to train')
+    parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
+    parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
     args = parser.parse_args()
     
     # Load hyperparameters
@@ -209,6 +213,15 @@ def main():
     # Override with command line arguments if provided
     if args.model_type:
         hparams['model_type'] = args.model_type
+    
+    if args.fast:
+        hparams['fast_mode'] = True
+        info("Fast evaluation mode enabled")
+    
+    if args.eval_freq != 1:
+        hparams['eval_frequency'] = args.eval_freq
+        info(f"Detailed evaluation will run every {args.eval_freq} epochs")
+        
         
     # Set default dataset path if not provided
     if hparams['taxo_path'] == "":

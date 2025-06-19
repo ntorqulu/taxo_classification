@@ -70,3 +70,17 @@ python -m src.preprocessing.filter
 ```
 
 ### Testing the architechtures
+
+
+
+# Preguntes a resoldre:
+## Donat que tenim un problema de balanceig, podem solucionar-ho amb data augmentation? comparem diferents mètodes amb no augmentar les dades.
+
+## evaluar quin encoding dels que proposem va millor per cada model
+
+## comparar la performance dels diferents models
+
+## provar amb totes les classes a nivell d'ordre
+
+
+
