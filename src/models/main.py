@@ -64,6 +64,8 @@ def run_experiment(hparams: dict) -> dict:
         seq_len_filter=hparams.get("seq_len_filter", None)
     )
 
+    # Validate labels
+
     info(f"Validating labels")
     labels = taxo_data_loaders.get_labels()
     level_name = hparams["label_column_name"]
@@ -78,10 +80,26 @@ def run_experiment(hparams: dict) -> dict:
         if results['unknown']:
             warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
 
+    # Log a summary of the label values and stratificacion
+
+    summary = { }
+    summary_total = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
     for ds in ('train', 'eval', 'test'):
-        info(f"Label distribution for {ds} with {sum(v[1][0] for v in labels[ds].items())} instances:")
-        max_len = max(len(v[0]) for v in labels[ds].items())
-        [info(f"    {v[0]:<{max_len+1}} {v[1][0]:>7} {100*v[1][1]:6.2f}% ") for v in labels[ds].items()]
+        for name, (count, pct) in labels[ds].items():
+            if name not in summary:
+                summary[name] = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
+            summary[name][ds] = (count, pct)
+            summary_total[ds] = (summary_total[ds][0]+count, summary_total[ds][1]+pct)
+    summary[' '] = summary_total
+    name_max_len = max(len(v[0]) for v in labels[ds].items())
+    info(f"{' '*(name_max_len+2)} {'train':^15}  {'eval':^15}  {'test':^15}")
+    for name in summary.keys():
+        line = f"{name:<{name_max_len+2}} "
+        for ds in ('train', 'eval', 'test'):
+            line += f"{summary[name][ds][0]:>7} {100*summary[name][ds][1]:>6.2f}% "
+        info(line)
+
+    # Log the dataset length and sequence lenghts
 
     info(f"Full dataset - {CachedDataFrame.get_length()}")
     info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
@@ -92,7 +110,7 @@ def run_experiment(hparams: dict) -> dict:
     info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
 
     # Create model using factory
-    model_params = {
+    model_params: dict[str, Any] = {
         'input_size': taxo_data_loaders.data_length,
         'output_size': taxo_data_loaders.num_labels,
     }
