@@ -10,6 +10,8 @@ from collections import Counter
 class TaxoDataLoaders:
     TRAIN_PCT = 0.8
     EVAL_PCT = 0.1
+    assert 0.6 < TRAIN_PCT + EVAL_PCT <= 0.95
+
     def __init__(self,
                  parquets_path: Path,
                  label_column_name: str,
@@ -18,6 +20,7 @@ class TaxoDataLoaders:
                  k: int = None,
                  bits: int = None,
                  seq_len_filter: int | None = None,
+                 stratify = None,
                  ):
 
         self.taxo_dataset = TaxoDataset(parquets_path=parquets_path,
@@ -75,16 +78,26 @@ class TaxoDataLoaders:
 
         raise ValueError(f"max_rows has to be a float or an int, not {type(max_rows)}")
 
-    def get_labels(self, count: bool = False) -> dict[str, dict[str, int] | list[str]]:
-        labels: dict[str, dict[str, int] | list[str]] = {}
+    def get_labels(self) -> dict[str, dict[str, tuple[int, float]]]:
+        """
+        Get label statistics for train, eval and test datasets.
+
+        Returns
+        -------
+        dict
+            Nested dictionary: {dataset_name: {label: (count, percentage)}}
+
+        Example: {'train': {'class_A': (100, 0.8), 'class_B': (25, 0.2)}}
+        """
+
+        labels: dict[str, dict[str, tuple[int, float]]] = {}
         for ds, name in ((self.train_dataset, 'train'), (self.eval_dataset, 'eval'), (self.test_dataset, 'test')):
+            len_ds = len(ds)
             labels_ds = [self.taxo_dataset.get_label(idx) for idx in ds.indices]
-            if count:
-                label_counts = Counter(labels_ds)
-                labels[name] = label_counts
-            else:
-                labels_distinct = list(set(labels_ds))
-                labels[name] = labels_distinct
+            label_counts = Counter(labels_ds).most_common()
+            labels[name] = {name: (n, n/len_ds) for name, n in label_counts}
+            assert sum(l[0] for l in labels[name].values()) == len_ds
+            assert abs(sum(l[1] for l in labels[name].values()) - 1.0) < 0.1
         return labels
 
     @property

@@ -65,9 +65,11 @@ def run_experiment(hparams: dict) -> dict:
     )
 
     info(f"Validating labels")
-    labels = taxo_data_loaders.get_labels(count=False)
+    labels = taxo_data_loaders.get_labels()
+    level_name = hparams["label_column_name"]
+
     for ds in ('train', 'eval', 'test'):
-        results = wrong_class_values(level_name=hparams["label_column_name"], values=labels[ds])
+        results = wrong_class_values(level_name=level_name, values=list(labels[ds].keys()))
         if not results:
             info(f"Label values in {ds} dataset are valid")
             continue
@@ -75,6 +77,11 @@ def run_experiment(hparams: dict) -> dict:
             warn(f"Missing label values found in {ds} dataset: {results['missing']}")
         if results['unknown']:
             warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
+
+    for ds in ('train', 'eval', 'test'):
+        info(f"Label distribution for {ds} with {sum(v[1][0] for v in labels[ds].items())} instances:")
+        max_len = max(len(v[0]) for v in labels[ds].items())
+        [info(f"    {v[0]:<{max_len+1}} {v[1][0]:>7} {100*v[1][1]:6.2f}% ") for v in labels[ds].items()]
 
     info(f"Full dataset - {CachedDataFrame.get_length()}")
     info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
