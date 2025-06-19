@@ -1,11 +1,7 @@
+from dataset.utils import info, warn
+
 """Constants used throughout the project."""
 
-TAXONOMY_LEVELS: list[str] = [
-    'kingdom_name',
-    'phylum_name',
-    'class_name',
-    'order_name'
-]
 
 # Taxonomy classification labels for different taxonomic levels
 TAXONOMY_LABELS: dict[str, list[str]]= {
@@ -26,6 +22,30 @@ TAXONOMY_LABELS: dict[str, list[str]]= {
            'Other_insecta','No_insecta'
     ],
 }
+
+TAXONOMY_LEVELS: list[str] = list(TAXONOMY_LABELS.keys())
+
+def wrong_class_values(level_name: str, values: list | dict) -> None | dict[str, list[str]]:
+    if level_name not in TAXONOMY_LABELS:
+        raise ValueError(f"Invalid taxonomic level: {level_name}")
+
+    if isinstance(values, dict):
+        values = list(values.keys())
+    values = set(values)
+
+    level_values = set(TAXONOMY_LABELS[level_name])
+
+    missing_values = level_values - values
+    unknown_values = values - level_values
+
+    if not missing_values and not unknown_values:
+        return None
+
+    return {
+        'missing': list(missing_values),
+        'unknown': list(unknown_values)
+    }
+
 
 def get_class_names(label_column_name: str) -> list:
     """

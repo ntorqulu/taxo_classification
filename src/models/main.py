@@ -10,9 +10,9 @@ import argparse
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset.cached_dataframe import CachedDataFrame
-from dataset.utils import info, get_base_parquets_path, DEFAULT_DATASET_NAME
+from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from constants.taxonomy_labels import get_class_names
+from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
 from models.training.trainer import Trainer
 from models.results import Results, plot_results
@@ -63,6 +63,18 @@ def run_experiment(hparams: dict) -> dict:
         max_rows=hparams["max_rows"],
         seq_len_filter=hparams.get("seq_len_filter", None)
     )
+
+    info(f"Validating labels")
+    labels = taxo_data_loaders.get_labels(count=False)
+    for ds in ('train', 'eval', 'test'):
+        results = wrong_class_values(level_name=hparams["label_column_name"], values=labels[ds])
+        if not results:
+            info(f"Label values in {ds} dataset are valid")
+            continue
+        if results['missing']:
+            warn(f"Missing label values found in {ds} dataset: {results['missing']}")
+        if results['unknown']:
+            warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
 
     info(f"Full dataset - {CachedDataFrame.get_length()}")
     info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")

@@ -251,25 +251,8 @@ class TaxoDataset(Dataset):
 
         return encoding, label
 
-    def get_sequence(self, idx: int) -> str:
-        """
-        Get the sequence at the specified index.
 
-        Parameters
-        ----------
-        idx:
-            Index of the sequence to retrieve.
-
-        Returns
-        -------
-        Sequence at the specified index.
-
-        Raises
-        ------
-        IndexError
-            If the provided index is negative or exceeds the maximum allowed
-            index of the dataset.
-        """
+    def _get_column_value(self, idx:int, column_name: str):
         if idx < 0:
             raise IndexError(f"Index {idx} is negative")
         if idx >= len(self):
@@ -278,9 +261,17 @@ class TaxoDataset(Dataset):
         if self._filter_indexes:
             idx = self._filter_indexes[idx]
 
-        sequence = self._df.loc[idx, CachedDataFrame.SEQUENCE_COLUMN_NAME]
-        assert isinstance(sequence, str), sequence
+        value = self._df.loc[idx, column_name]
+        return value
 
+    def get_label(self, idx: int) -> str:
+        label = self._get_column_value(idx, self.label_column_name)
+        assert isinstance(label, str), label
+        return label
+
+    def get_sequence(self, idx: int) -> str:
+        sequence = self._get_column_value(idx, CachedDataFrame.SEQUENCE_COLUMN_NAME)
+        assert isinstance(sequence, str), sequence
         return sequence
 
     @property

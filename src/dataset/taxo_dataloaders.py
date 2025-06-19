@@ -4,6 +4,8 @@ import torch
 from dataset.taxo_dataset import TaxoDataset
 from torch.utils.data import random_split, Subset, DataLoader
 from dataset.utils import warn
+from collections import Counter
+
 
 class TaxoDataLoaders:
     TRAIN_PCT = 0.8
@@ -34,22 +36,23 @@ class TaxoDataLoaders:
         eval_size = int(len(self.dataset) * TaxoDataLoaders.EVAL_PCT)
         test_size = len(self.dataset) - eval_size - train_size
 
-        train_dataset, eval_dataset, test_dataset = random_split(self.dataset, [train_size, eval_size, test_size])
+        self.train_dataset, self.eval_dataset, self.test_dataset = random_split(self.dataset,
+                                                                                [train_size, eval_size, test_size])
 
         self.train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset,
+            dataset=self.train_dataset,
             batch_size=batch_size,
             shuffle=True
         )
 
         self.eval_loader = torch.utils.data.DataLoader(
-            dataset=eval_dataset,
+            dataset=self.eval_dataset,
             batch_size=batch_size,
             shuffle=True
         )
 
         self.test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset,
+            dataset=self.test_dataset,
             batch_size=batch_size,
             shuffle=True
         )
@@ -71,6 +74,18 @@ class TaxoDataLoaders:
             return max_rows
 
         raise ValueError(f"max_rows has to be a float or an int, not {type(max_rows)}")
+
+    def get_labels(self, count: bool = False) -> dict[str, dict[str, int] | list[str]]:
+        labels: dict[str, dict[str, int] | list[str]] = {}
+        for ds, name in ((self.train_dataset, 'train'), (self.eval_dataset, 'eval'), (self.test_dataset, 'test')):
+            labels_ds = [self.taxo_dataset.get_label(idx) for idx in ds.indices]
+            if count:
+                label_counts = Counter(labels_ds)
+                labels[name] = label_counts
+            else:
+                labels_distinct = list(set(labels_ds))
+                labels[name] = labels_distinct
+        return labels
 
     @property
     def data_loaders(self) -> (DataLoader, DataLoader, DataLoader):
