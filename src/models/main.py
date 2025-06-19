@@ -199,8 +199,8 @@ def main():
     check_available_devices()
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Train taxonomy classification models')
-    parser.add_argument('--config', type=str, default='kmer_hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn'], 
+    parser.add_argument('--config', type=str, default='hyperparams/kmer_hparams.json', help='Path to hyperparameters JSON file')
+    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn'],
                        help='Model type to train')
     parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
     parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
