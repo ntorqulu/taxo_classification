@@ -15,7 +15,6 @@ from dataset.taxo_dataloaders import TaxoDataLoaders
 from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
 from models.training.trainer import Trainer
-from models.results import Results, plot_results
 
 def init_device(seed: int = 42) -> torch.device:
     np.random.seed(seed)

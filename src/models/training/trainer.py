@@ -6,9 +6,7 @@ from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 import os
 import time
 from torch.utils.tensorboard import SummaryWriter
-from models.architectures.base_model import BaseModel
 from dataset.utils import info
-from models.results import Results, compute_accuracy
 
 class Trainer:
     """Class for training and evaluating models."""
@@ -99,17 +97,14 @@ class Trainer:
         avg_loss = total_loss / len(train_loader)
         avg_accuracy = correct / total
         
-        # After each epoch, log the loss and accuracy
-        info(f'Train Epoch: {epoch} Loss: {avg_loss:.6f}, Acc: {100. * avg_accuracy:.2f}%')
-        
         # Log to TensorBoard
         self.writer.add_scalar('Loss/train', avg_loss, epoch)
         self.writer.add_scalar('Accuracy/train', avg_accuracy, epoch)
         
         return avg_loss, avg_accuracy
-    
+
     @torch.no_grad()
-    def evaluate(self, val_loader: DataLoader, epoch: int, prefix: str = 'val') -> Tuple[float, float]:
+    def evaluate(self, val_loader: DataLoader, epoch: int, prefix: str = 'val') -> Tuple[float, float, Dict[str, float]]:
         """
         Evaluate model on validation/test data.
         
@@ -119,16 +114,20 @@ class Trainer:
             prefix: Prefix for TensorBoard logs ('val' or 'test')
             
         Returns:
-            Tuple of (average loss, average accuracy)
+            Tuple of (average loss, average accuracy, metrics dict)
         """
+        from models.training.results import compute_metrics
+        
         self.model.eval()
         total_loss = 0.0
-        correct = 0
-        total = 0
+        all_predictions = []
+        all_targets = []
         
         for data, target in val_loader:
             data, target = data.to(self.device), target.to(self.device)
-            
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
+                
             # Forward pass
             output = self.model(data)
             
@@ -138,21 +137,32 @@ class Trainer:
             # Track metrics
             total_loss += loss.item()
             pred = output.argmax(dim=1)
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            total += target.size(0)
             
-        # Compute averages
+            # Collect predictions and targets for overall metrics
+            all_predictions.extend(pred.cpu().numpy())
+            all_targets.extend(target.view(-1).cpu().numpy())
+        
+        # Compute average loss
         avg_loss = total_loss / len(val_loader)
-        avg_accuracy = correct / total
+        
+        # Compute all metrics
+        metrics = compute_metrics(all_targets, all_predictions)
+        avg_accuracy = metrics['accuracy']
         
         # Log to TensorBoard
         self.writer.add_scalar(f'Loss/{prefix}', avg_loss, epoch)
         self.writer.add_scalar(f'Accuracy/{prefix}', avg_accuracy, epoch)
+        self.writer.add_scalar(f'Precision/{prefix}', metrics['precision'], epoch)
+        self.writer.add_scalar(f'Recall/{prefix}', metrics['recall'], epoch)
+        self.writer.add_scalar(f'F1/{prefix}', metrics['f1'], epoch)
         
-        return avg_loss, avg_accuracy
+        info(f'{prefix.capitalize()} metrics - Loss: {avg_loss:.4f}, Acc: {avg_accuracy:.4f}, ' +
+            f'F1: {metrics["f1"]:.4f}, Precision: {metrics["precision"]:.4f}, Recall: {metrics["recall"]:.4f}')
+        
+        return avg_loss, avg_accuracy, metrics
     
     @torch.no_grad()
-    def quick_evaluate(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Tuple[float, float]:
+    def quick_evaluate(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Tuple[float, float, Dict[str, float]]:
         """
         Quick evaluation without per-class metrics or visualizations.
         
@@ -162,12 +172,14 @@ class Trainer:
             prefix: Prefix for TensorBoard logs
             
         Returns:
-            Tuple of (average loss, average accuracy)
+            Tuple of (average loss, average accuracy, metrics dict)
         """
+        from models.training.results import compute_metrics
+        
         self.model.eval()
         total_loss = 0.0
-        correct = 0
-        total = 0
+        all_predictions = []
+        all_targets = []
         
         for data, target in data_loader:
             data, target = data.to(self.device), target.to(self.device)
@@ -183,106 +195,93 @@ class Trainer:
             # Track metrics
             total_loss += loss.item()
             pred = output.argmax(dim=1)
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            total += target.size(0)
-            
-        # Compute averages
+            all_predictions.extend(pred.cpu().numpy())
+            all_targets.extend(target.view(-1).cpu().numpy())
+        
+        # Compute average loss
         avg_loss = total_loss / len(data_loader)
-        avg_accuracy = correct / total
+        
+        # Compute all metrics
+        metrics = compute_metrics(all_targets, all_predictions)
+        avg_accuracy = metrics['accuracy']
         
         # Log to TensorBoard
         self.writer.add_scalar(f'Loss/{prefix}', avg_loss, epoch)
         self.writer.add_scalar(f'Accuracy/{prefix}', avg_accuracy, epoch)
+        self.writer.add_scalar(f'Precision/{prefix}', metrics['precision'], epoch)
+        self.writer.add_scalar(f'Recall/{prefix}', metrics['recall'], epoch)
+        self.writer.add_scalar(f'F1/{prefix}', metrics['f1'], epoch)
         
-        return avg_loss, avg_accuracy
+        return avg_loss, avg_accuracy, metrics
     
     @torch.no_grad()
     def compute_per_class_metrics(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Dict[str, float]:
-        """
-        Compute and log metrics for each class individually.
+        """Compute metrics for each class."""
+        from sklearn.metrics import precision_recall_fscore_support
         
-        Args:
-            data_loader: DataLoader for validation/test data
-            epoch: Current epoch number
-            prefix: Prefix for TensorBoard logs ('val' or 'test')
-            
-        Returns:
-            Dictionary with per-class metrics
-        """
         self.model.eval()
         
-        # Get number of classes from first batch
-        batch = next(iter(data_loader))
-        output = self.model(batch[0][:1].to(self.device))
-        num_classes = output.size(1)
-        
-        if epoch == 1 and prefix == 'val':
-            info(f"Class name mappings for {num_classes} classes:")
-            for class_idx in range(num_classes):
-                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
-                info(f"  Class index {class_idx} -> '{class_name}'")
-        
-        # Initialize counters for each class
-        correct_per_class = torch.zeros(num_classes)
-        total_per_class = torch.zeros(num_classes)
-        loss_per_class = torch.zeros(num_classes)
+        # Get all predictions and targets
+        all_predictions = []
+        all_targets = []
         
         # Process all batches
         for data, target in data_loader:
             data, target = data.to(self.device), target.view(-1).to(self.device)
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
             
             # Forward pass
             output = self.model(data)
             predictions = output.argmax(dim=1)
             
-            # Calculate metrics for each class
-            for class_idx in range(num_classes):
-                # Find samples with this class as ground truth
-                class_mask = (target == class_idx)
-                class_count = class_mask.sum().item()
-                
-                if class_count > 0:
-                    # Accuracy: correctly predicted / total for this class
-                    # Count correct predictions for this class
-                    correct = (predictions[class_mask] == class_idx).sum().item()
-                    correct_per_class[class_idx] += correct
-                    total_per_class[class_idx] += class_count
-                    
-                    # Loss: calculate separately using one-hot targets
-                    # Select only the relevant outputs
-                    relevant_outputs = output[class_mask]
-                    
-                    # Create targets for this class (all same class)
-                    class_targets = torch.full((class_count,), class_idx, 
-                                            device=self.device, dtype=torch.long)
-                    
-                    # Compute loss
-                    class_loss = self.criterion(relevant_outputs, class_targets)
-                    loss_per_class[class_idx] += class_loss.item() * class_count
+            # Store for overall metrics
+            all_predictions.extend(predictions.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
         
-        # Calculate final metrics and log to TensorBoard
+        # Get number of classes
+        batch = next(iter(data_loader))
+        output = self.model(batch[0][:1].to(self.device))
+        num_classes = output.size(1)
+        
+        # Calculate metrics
         metrics = {}
         
+        # Calculate per-class precision, recall, and F1
+        precision, recall, f1, support = precision_recall_fscore_support(
+            all_targets, all_predictions, average=None, labels=range(num_classes), zero_division=0
+        )
+        
+        # Calculate overall metrics
+        overall_precision, overall_recall, overall_f1, _ = precision_recall_fscore_support(
+            all_targets, all_predictions, average='macro', zero_division=0
+        )
+        
+        # Store overall metrics
+        metrics['overall_precision'] = overall_precision
+        metrics['overall_recall'] = overall_recall
+        metrics['overall_f1'] = overall_f1
+        
+        # Log to TensorBoard
+        self.writer.add_scalar(f'Overall/Precision_{prefix}', overall_precision, epoch)
+        self.writer.add_scalar(f'Overall/Recall_{prefix}', overall_recall, epoch)
+        self.writer.add_scalar(f'Overall/F1_{prefix}', overall_f1, epoch)
+        
+        # Store and log per-class metrics
         for class_idx in range(num_classes):
-            if total_per_class[class_idx] > 0:
-                # Calculate metrics
-                accuracy = correct_per_class[class_idx] / total_per_class[class_idx]
-                avg_loss = loss_per_class[class_idx] / total_per_class[class_idx]
-                
-                # Store in return dict
-                metrics[f'class_{class_idx}_acc'] = accuracy.item()
-                metrics[f'class_{class_idx}_loss'] = avg_loss.item()
-                
-                # Get class name if available
-                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
-                
-                # Log to TensorBoard
-                self.writer.add_scalar(f'Class_{class_name}/Accuracy_{prefix}', accuracy, epoch)
-                self.writer.add_scalar(f'Class_{class_name}/Loss_{prefix}', avg_loss, epoch)
-                
-                # Also log class sample count to track class imbalance
-                self.writer.add_scalar(f'Class_{class_name}/Samples_{prefix}', total_per_class[class_idx], epoch)
-                
+            class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
+            
+            # Store per-class metrics
+            metrics[f'class_{class_idx}_precision'] = precision[class_idx]
+            metrics[f'class_{class_idx}_recall'] = recall[class_idx]
+            metrics[f'class_{class_idx}_f1'] = f1[class_idx]
+            
+            # Log to TensorBoard
+            self.writer.add_scalar(f'Class_{class_name}/Precision_{prefix}', precision[class_idx], epoch)
+            self.writer.add_scalar(f'Class_{class_name}/Recall_{prefix}', recall[class_idx], epoch)
+            self.writer.add_scalar(f'Class_{class_name}/F1_{prefix}', f1[class_idx], epoch)
+            self.writer.add_scalar(f'Class_{class_name}/Support_{prefix}', support[class_idx], epoch)
+        
         return metrics
 
     def log_confusion_matrix(self, data_loader: DataLoader, epoch: int, prefix: str = 'val'):
@@ -616,174 +615,214 @@ class Trainer:
         self.writer.add_text(f"{prefix}_phylum_metrics", table, epoch)
         
     def train(self, 
-         train_loader: DataLoader,
-         val_loader: DataLoader,
-         test_loader: Optional[DataLoader] = None,
-         epochs: int = 10,
-         patience: int = 5,
-         save_best: bool = True,
-         fast_mode: bool = False,
-         eval_frequency: int = 1) -> Dict[str, List[float]]:
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        test_loader: Optional[DataLoader] = None,
+        epochs: int = 10,
+        patience: int = 5,
+        save_best: bool = True,
+        fast_mode: bool = False,
+        eval_frequency: int = 1) -> Dict[str, List[float]]:
         """
         Train model for multiple epochs.
         
         Args:
             train_loader: DataLoader for training data
             val_loader: DataLoader for validation data
-            test_loader: DataLoader for test data
-            epochs: Number of epochs to train
-            patience: Early stopping patience
-            save_best: Whether to save best model
-            fast_mode: If True, use faster evaluation with minimal metrics
-            eval_frequency: How often to run detailed evaluation (epochs)
+            test_loader: DataLoader for test data (optional)
+            epochs: Maximum number of epochs to train
+            patience: Early stopping patience (epochs with no improvement)
+            save_best: Whether to save the best model checkpoint
+            fast_mode: Use faster evaluation with minimal metrics
+            eval_frequency: How often to run full evaluation (epochs)
             
         Returns:
             Dictionary with training history
         """
+        from sklearn.metrics import precision_recall_fscore_support
+        
+        # Initialize history dictionary
         history = {
             'train_loss': [],
             'train_acc': [],
+            'train_f1': [],
+            'train_precision': [],
+            'train_recall': [],
             'val_loss': [],
             'val_acc': [],
-            'test_loss': [],
-            'test_acc': [],
-            'per_class_metrics': []  # Add this to store per-class metrics
+            'val_f1': [],
+            'val_precision': [],
+            'val_recall': [],
         }
         
+        # Add test metrics if test_loader is provided
+        if test_loader is not None:
+            history.update({
+                'test_loss': [],
+                'test_acc': [],
+                'test_f1': [],
+                'test_precision': [],
+                'test_recall': [],
+            })
+        
+        # Initialize tracking variables
+        best_val_acc = 0.0
         best_val_loss = float('inf')
         patience_counter = 0
         best_epoch = 0
+        best_model_state = None
         
+        # Start training timer
         t0 = time.time()
-        info(f"Starting training for {epochs} epochs in {'fast' if fast_mode else 'detailed'} mode")
+        info(f"Starting training for {epochs} epochs in {'fast' if fast_mode else 'standard'} mode")
         
         for epoch in range(1, epochs + 1):
-            # Train
+            # Train one epoch
             train_loss, train_acc = self.train_epoch(train_loader, epoch)
             history['train_loss'].append(train_loss)
             history['train_acc'].append(train_acc)
             
+            # Calculate additional training metrics (F1, precision, recall)
+            self.model.eval()
+            with torch.no_grad():
+                all_preds = []
+                all_targets = []
+                
+                for data, target in train_loader:
+                    data, target = data.to(self.device), target.to(self.device)
+                    if data.dim() == 3:
+                        data = data.unsqueeze(1)
+                    output = self.model(data)
+                    pred = output.argmax(dim=1)
+                    all_preds.extend(pred.cpu().numpy())
+                    all_targets.extend(target.view(-1).cpu().numpy())
+                
+                # Calculate training metrics
+                precision, recall, f1, _ = precision_recall_fscore_support(
+                    all_targets, all_preds, average='macro', zero_division=0
+                )
+            
+            # Store and log training metrics
+            history['train_f1'].append(f1)
+            history['train_precision'].append(precision)
+            history['train_recall'].append(recall)
+            
+            # Log to TensorBoard
+            self.writer.add_scalar('F1/train', f1, epoch)
+            self.writer.add_scalar('Precision/train', precision, epoch)
+            self.writer.add_scalar('Recall/train', recall, epoch)
+            
+            # Log to console
+            info(f'Epoch {epoch}/{epochs} - Train Loss: {train_loss:.4f}, Acc: {train_acc:.4f}, ' +
+                f'F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}')
+            
             # Decide if we should run detailed evaluation in this epoch
             run_detailed = (epoch % eval_frequency == 0 or epoch == 1 or epoch == epochs)
             
-            # Compute train metrics (more detailed if not in fast mode)
-            if not fast_mode and run_detailed:
-                train_class_metrics = self.compute_per_class_metrics(train_loader, epoch, prefix='train')
-                history.setdefault('train_per_class_metrics', []).append(train_class_metrics)
-                self.log_learning_progress_table(train_class_metrics, epoch, prefix='train')
-                
-                # Create visualizations less frequently
-                if epoch % (eval_frequency * 2) == 0 or epoch == 1 or epoch == epochs:
-                    self.log_class_performance_chart(train_loader, epoch, prefix='train')
-                    self.log_confusion_matrix(train_loader, epoch, prefix='train')
-            
-            # Validation - always needed for early stopping
+            # Validation phase
             if fast_mode and not run_detailed:
-                # Fast evaluation
-                val_loss, val_acc = self.quick_evaluate(val_loader, epoch, prefix='val')
+                # Quick evaluation
+                val_loss, val_acc, val_metrics = self.quick_evaluate(val_loader, epoch, prefix='val')
             else:
                 # Standard evaluation
-                val_loss, val_acc = self.evaluate(val_loader, epoch, prefix='val')
-                
+                val_loss, val_acc, val_metrics = self.evaluate(val_loader, epoch, prefix='val')
+            
+            # Store validation metrics
             history['val_loss'].append(val_loss)
             history['val_acc'].append(val_acc)
+            history['val_f1'].append(val_metrics['f1'])
+            history['val_precision'].append(val_metrics['precision'])
+            history['val_recall'].append(val_metrics['recall'])
             
-            # Detailed validation metrics only if not in fast mode and on scheduled epochs
+            # Detailed evaluation
             if not fast_mode and run_detailed:
                 # Calculate per-class metrics
                 val_class_metrics = self.compute_per_class_metrics(val_loader, epoch, prefix='val')
-                history['per_class_metrics'].append(val_class_metrics)
-                
-                # Log learning progress table
-                self.log_learning_progress_table(val_class_metrics, epoch, prefix='val')
-                
-                # Create visualizations
-                self.log_class_performance_chart(val_loader, epoch, prefix='val')
-                self.log_confusion_matrix(val_loader, epoch, prefix='val')
-                    
-                # Plot evolution of phylum performance
-                if epoch >= eval_frequency*2:
-                    self.log_phylum_evolution_chart(history, epoch)
+                history.setdefault('per_class_metrics', []).append(val_class_metrics)
             
-            # Test evaluation
-            if test_loader is not None:
-                if fast_mode:
-                    # In fast mode, evaluate test set only on final epoch
-                    if epoch == epochs or (patience_counter >= patience):
-                        test_loss, test_acc = self.quick_evaluate(test_loader, epoch, prefix='test')
-                        history['test_loss'].append(test_loss)
-                        history['test_acc'].append(test_acc)
-                elif run_detailed:
-                    # In detailed mode, evaluate test set on scheduled epochs
-                    test_loss, test_acc = self.evaluate(test_loader, epoch, prefix='test')
+            # Test evaluation if test_loader is provided
+            if test_loader is not None and (run_detailed or epoch == epochs):
+                test_loss, test_acc, test_metrics = self.evaluate(test_loader, epoch, prefix='test')
+                
+                # Store test metrics
+                if epoch % eval_frequency == 0 or epoch == epochs:
                     history['test_loss'].append(test_loss)
                     history['test_acc'].append(test_acc)
-                    
-                    # Calculate per-class metrics on test set
-                    test_class_metrics = self.compute_per_class_metrics(test_loader, epoch, prefix='test')
-                    
-                    # Log test metrics table
-                    self.log_learning_progress_table(test_class_metrics, epoch, prefix='test')
-                    
-                    # Create test visualizations
-                    if epoch % (eval_frequency * 2) == 0 or epoch == epochs:
-                        self.log_class_performance_chart(test_loader, epoch, prefix='test')
-                        self.log_confusion_matrix(test_loader, epoch, prefix='test')
+                    history['test_f1'].append(test_metrics['f1'])
+                    history['test_precision'].append(test_metrics['precision'])
+                    history['test_recall'].append(test_metrics['recall'])
             
-            # Learning rate scheduler
+            # Learning rate scheduler step
             if self.scheduler is not None:
                 if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                     self.scheduler.step(val_loss)
                 else:
                     self.scheduler.step()
-                    
-            # Save best model
-            if val_loss < best_val_loss:
+            
+            # Track best model
+            improved = False
+            
+            # Check if current model is better than best model
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
                 best_val_loss = val_loss
                 best_epoch = epoch
+                best_model_state = self.model.state_dict().copy()
                 patience_counter = 0
-                
-                if save_best:
-                    self._save_checkpoint(epoch, is_best=True)
+                improved = True
+            elif val_acc == best_val_acc and val_loss < best_val_loss:
+                # If accuracy is the same, use loss as tie-breaker
+                best_val_loss = val_loss
+                best_epoch = epoch
+                best_model_state = self.model.state_dict().copy()
+                patience_counter = 0
+                improved = True
             else:
                 patience_counter += 1
-                
-            # Save regular checkpoint (less frequently in fast mode)
-            checkpoint_freq = 10 if fast_mode else 5
-            if epoch % checkpoint_freq == 0:
-                self._save_checkpoint(epoch)
-                
-            # Early stopping
-            if patience_counter >= patience:
-                info(f"Early stopping at epoch {epoch}. Best epoch was {best_epoch}.")
-                break
-                    
-        # Training completed
-        seconds = time.time() - t0
-        minutes = int(seconds / 60)
-        seconds = int(seconds - minutes * 60)
-        info(f"Training completed in {minutes}m {seconds}s")
-        
-        # Final evaluation on test set if provided
-        if test_loader is not None:
-            info("Evaluating best model on test set...")
-            best_model_path = os.path.join(self.checkpoint_dir, f"{self.model.name}_best.pt")
-            if os.path.exists(best_model_path):
-                # Load best model
-                checkpoint = torch.load(best_model_path)
-                self.model.load_state_dict(checkpoint['model_state_dict'])
-                
-            test_loss, test_acc = self.evaluate(test_loader, epochs, prefix='test')
             
-            # Always do detailed metrics for final evaluation unless in fast mode
+            # Save checkpoint if improved
+            if improved and save_best:
+                self._save_checkpoint(epoch, is_best=True)
+            
+            # Save regular checkpoint every 5 epochs
+            if epoch % 5 == 0 and save_best:
+                self._save_checkpoint(epoch)
+            
+            # Early stopping check
+            if patience_counter >= patience:
+                info(f"Early stopping at epoch {epoch}. Best epoch was {best_epoch} with validation accuracy {best_val_acc:.4f}.")
+                break
+        
+        # Training completed
+        total_time = time.time() - t0
+        mins, secs = divmod(total_time, 60)
+        hours, mins = divmod(mins, 60)
+        
+        info(f"Training completed in {int(hours)}h {int(mins)}m {int(secs)}s")
+        info(f"Best epoch: {best_epoch} with validation accuracy: {best_val_acc:.4f}")
+        
+        # Restore best model
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
+            info(f"Restored best model from epoch {best_epoch}")
+        
+        # Final evaluation on test set
+        if test_loader is not None:
+            info("Evaluating final model on test set...")
+            test_loss, test_acc, test_metrics = self.evaluate(test_loader, epochs, prefix='final')
+            
+            # Log final test results
+            info(f"Final test results - Loss: {test_loss:.4f}, Accuracy: {test_acc:.4f}")
+            info(f"Final test metrics - F1: {test_metrics['f1']:.4f}, " + 
+                f"Precision: {test_metrics['precision']:.4f}, Recall: {test_metrics['recall']:.4f}")
+            
+            # Compute detailed per-class metrics for final model
             if not fast_mode:
-                test_class_metrics = self.compute_per_class_metrics(test_loader, epochs, prefix='final_test')
-                self.log_class_performance_chart(test_loader, epochs, prefix='final_test')
-                self.log_confusion_matrix(test_loader, epochs, prefix='final_test')
-                self.log_learning_progress_table(test_class_metrics, epochs, prefix='final_test')
+                final_class_metrics = self.compute_per_class_metrics(test_loader, epochs, prefix='final')
                 
-            info(f"Final test accuracy: {100. * test_acc:.2f}%")
-                
+                # Log confusion matrix for final model
+                self.log_confusion_matrix(test_loader, epochs, prefix='final')
+        
         return history
     
     def _save_checkpoint(self, epoch: int, is_best: bool = False) -> None:
