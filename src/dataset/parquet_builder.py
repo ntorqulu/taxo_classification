@@ -2,7 +2,7 @@ import os
 from typing import Callable, Any
 
 import pandas as pd
-from dataset.utils import get_default_data_dir, info, get_parquet_path, encoding_column_name
+from dataset.utils import get_default_data_path, info, get_parquet_file_path, encoding_column_name
 from feature_extraction.main import SequenceCoder
 from multiprocessing import Process
 
@@ -11,7 +11,7 @@ class ParquetBuilder:
     KMERS_SIZES = range(1, 5+1)
 
     def __init__(self,
-                 csv_path: str = get_default_data_dir()+"/dataset.csv",
+                 csv_path: str = get_default_data_path() / "dataset.csv",
                  sequence_column_name: str = "sequence"):
         gzip_path: str = csv_path + ".gz"
         if os.path.exists(gzip_path):
@@ -40,7 +40,7 @@ class ParquetBuilder:
         if self.df is None:
             raise RuntimeError("You must load the database first")
 
-        path = get_parquet_path(self.csv_path)
+        path = get_parquet_file_path(self.csv_path)
         if not os.path.exists(path):
             self.df.to_parquet(path, compression="gzip")
         else:
@@ -50,7 +50,7 @@ class ParquetBuilder:
     def create_kmer_parquets(self, k: int | None= None, parallelize: bool = True):
         if k is not None:
             col_name = encoding_column_name(k=k)
-            path = get_parquet_path(self.csv_path, k=k)
+            path = get_parquet_file_path(self.csv_path, k=k)
             if os.path.exists(path):
                 info(f"Skipping {k=} because exists {path}")
                 return
@@ -83,7 +83,7 @@ class ParquetBuilder:
     def create_bit_parquets(self, bits: int | None = None, parallelize: bool = True, max_seq_length: int = 320):
         if bits is not None:
             col_name = encoding_column_name(bits=bits)
-            path = get_parquet_path(self.csv_path, bits=bits)
+            path = get_parquet_file_path(self.csv_path, bits=bits)
             if os.path.exists(path):
                 info(f"Skipping {bits=} because exists {path}")
                 return
@@ -130,7 +130,7 @@ class ParquetBuilder:
     def create_4row_parquet(self, seq_length: int = 313):
         assert self.df is not None
 
-        path = get_parquet_path(self.csv_path, bits=0)
+        path = get_parquet_file_path(self.csv_path, bits=0)
         if os.path.exists(path):
             info(f"Skipping '4 row matrix' because exists {path}")
         else:
@@ -207,15 +207,15 @@ class ParquetBuilder:
                     info(f"      First row: {df[c]}")
             del df
 
-        p = get_parquet_path(self.csv_path)
+        p = get_parquet_file_path(self.csv_path)
         print_basic_info(p)
 
         for bits in self.sequence_coder.bit_mapping:
-            p = get_parquet_path(self.csv_path, bits=bits)
+            p = get_parquet_file_path(self.csv_path, bits=bits)
             print_basic_info(p)
 
         for k in ParquetBuilder.KMERS_SIZES:
-            p = get_parquet_path(self.csv_path, k=k)
+            p = get_parquet_file_path(self.csv_path, k=k)
             print_basic_info(p)
     
     def create_parquets_unique(self, coding, parallelize: bool = True):

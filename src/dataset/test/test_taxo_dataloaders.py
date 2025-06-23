@@ -2,12 +2,13 @@ import pytest
 from torch.utils.data import DataLoader
 from constants.taxonomy_labels import TAXONOMY_LABELS
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from dataset.utils import get_default_dataset_path
+from dataset.utils import get_base_parquets_path, DEFAULT_DATASET_NAME
 
 test_label_column_name = list(TAXONOMY_LABELS.keys())[0]
 
 def test_init():
-    t = TaxoDataLoaders(taxo_path=get_default_dataset_path(), label_column_name=test_label_column_name,
+    t = TaxoDataLoaders(parquets_path=get_base_parquets_path(),
+                        label_column_name=test_label_column_name,
                         batch_size=10, k=1)
     train_loader: DataLoader
     eval_loader: DataLoader
@@ -19,7 +20,8 @@ def test_init():
 
 def test_init_max_rows():
     for r in range(1000, 10000, 123):
-        t = TaxoDataLoaders(taxo_path=get_default_dataset_path(), label_column_name=test_label_column_name,
+        t = TaxoDataLoaders(parquets_path=get_base_parquets_path(),
+                            label_column_name=test_label_column_name,
                             batch_size=10, max_rows=r, k=1)
         train_loader: DataLoader
         eval_loader: DataLoader

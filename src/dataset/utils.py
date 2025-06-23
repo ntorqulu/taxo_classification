@@ -1,8 +1,11 @@
 import logging
-import os
 from pathlib import Path
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
+
+DEFAULT_DATASET_NAME = "filtered_ranks"
+DEFAULT_DATA_DIR_NAME = "data"
+DEFAULT_PARQUET_DIR_NAME = "parquets"
 
 def info(s: str):
     logging.info(s)
@@ -13,41 +16,43 @@ def warn(s: str):
 def error(s: str):
     logging.error(s)
 
-def get_default_data_dir() -> str:
-    path = Path(__file__).resolve().parent.parent.parent / 'data'
-    path = str(path)
+def get_default_data_path() -> Path:
+    path = Path(__file__).resolve().parent.parent.parent / DEFAULT_DATA_DIR_NAME
+    assert path.exists(), path
     return path
 
-def get_default_dataset_path() -> str:
-    path = get_default_data_dir()
-    path += "/dataset.csv"
+def get_base_parquets_path() -> Path:
+    path = get_default_data_path() / DEFAULT_PARQUET_DIR_NAME
+    assert path.exists(), path
     return path
 
-def get_parquet_path(csv_path: str = get_default_dataset_path(),
-                     k: int | None = None,
-                     bits: int | None = None # 0 for 4 row matrix
-                     ) -> str:
+def get_parquet_file_path(parquets_path: Path = get_base_parquets_path(),
+                          k: int | None = None,
+                          bits: int | None = None  # 0 for 4 row matrix
+                          ) -> Path:
     if k is not None and bits is not None:
         raise ValueError("k and bits cannot be indicated at the same time")
-    if csv_path.endswith('.csv'):
-        extension = '.csv'
-    elif csv_path.endswith('.csv.gz'):
-        extension = '.csv.gz'
-    else:
-        raise RuntimeError(f"Unsupported file extension: {csv_path}")
 
-    p = csv_path[:-len(extension)]
+    assert parquets_path.exists(), parquets_path
 
     if k is None and bits is None:
-        p += '.parquet'
+        pattern = 'dataset*.parquet'
+        files = list(parquets_path.glob(pattern))
+        file = [min(files, key=lambda f: len(f.name))]
     elif k is not None:
-        p += f'_kmer_{k}.parquet'
+        pattern = f'dataset*_kmer_{k}.parquet'
+        file = list(parquets_path.glob(pattern))
     elif bits == 0:
-        p += f'_4rowmatrix.parquet'
+        pattern = f'dataset*_4rowmatrix.parquet'
+        file = list(parquets_path.glob(pattern))
     else:
         assert bits is not None
-        p += f'_bits_{bits}.parquet'
-    return p
+        pattern = f'dataset*_bits_{bits}.parquet'
+        file = list(parquets_path.glob(pattern))
+
+    assert len(file) == 1, f"Found {len(file)} files matching pattern: {pattern}"
+
+    return file[0]
 
 def encoding_column_name(k: int | None = None, bits: int | None = None) -> str:
     if k is not None and bits is not None:

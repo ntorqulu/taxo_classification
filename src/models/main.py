@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -11,13 +13,9 @@ import argparse
 
 from torch.utils.tensorboard import SummaryWriter
 from dataset.cached_dataframe import CachedDataFrame
-from constants.taxonomy_labels import get_class_names
+from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from dataset.utils import get_default_dataset_path, info
-from torch.utils.tensorboard import SummaryWriter
-
-from models.results import Results, plot_results
-from models.training.trainer import Trainer
+from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
 
 
@@ -56,9 +54,11 @@ def run_experiment(hparams: dict) -> dict:
     device = init_device(hparams.get("seed", 42))
 
     # Load data
-    taxo_path = hparams["taxo_path"] if hparams["taxo_path"] else get_default_dataset_path()
+    parquets_path = hparams['parquets_path'] if hparams['parquets_path'] else get_base_parquets_path()
+    dataset_name = hparams['dataset_name']
+
     taxo_data_loaders = TaxoDataLoaders(
-        taxo_path=taxo_path,
+        parquets_path=Path(parquets_path) / dataset_name,
         label_column_name=hparams["label_column_name"],
         k=hparams["k"],
         bits=hparams["bits"],
@@ -66,6 +66,43 @@ def run_experiment(hparams: dict) -> dict:
         max_rows=hparams["max_rows"],
         seq_len_filter=hparams.get("seq_len_filter", None)
     )
+
+    # Validate labels
+
+    info(f"Validating labels")
+    labels = taxo_data_loaders.get_labels()
+    level_name = hparams["label_column_name"]
+
+    for ds in ('train', 'eval', 'test'):
+        results = wrong_class_values(level_name=level_name, values=list(labels[ds].keys()))
+        if not results:
+            info(f"Label values in {ds} dataset are valid")
+            continue
+        if results['missing']:
+            warn(f"Missing label values found in {ds} dataset: {results['missing']}")
+        if results['unknown']:
+            warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
+
+    # Log a summary of the label values and stratificacion
+
+    summary = { }
+    summary_total = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
+    for ds in ('train', 'eval', 'test'):
+        for name, (count, pct) in labels[ds].items():
+            if name not in summary:
+                summary[name] = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
+            summary[name][ds] = (count, pct)
+            summary_total[ds] = (summary_total[ds][0]+count, summary_total[ds][1]+pct)
+    summary[' '] = summary_total
+    name_max_len = max(len(v[0]) for v in labels[ds].items())
+    info(f"{' '*(name_max_len+2)} {'train':^15}  {'eval':^15}  {'test':^15}")
+    for name in summary.keys():
+        line = f"{name:<{name_max_len+2}} "
+        for ds in ('train', 'eval', 'test'):
+            line += f"{summary[name][ds][0]:>7} {100*summary[name][ds][1]:>6.2f}% "
+        info(line)
+
+    # Log the dataset length and sequence lenghts
 
     info(f"Full dataset - {CachedDataFrame.get_length()}")
     info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
@@ -76,9 +113,9 @@ def run_experiment(hparams: dict) -> dict:
     info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
     
     # Create model using factory
-    model_params = {
-        "input_size": taxo_data_loaders.data_length,
-        "output_size": taxo_data_loaders.num_labels,
+    model_params: dict[str, Any] = {
+        'input_size': taxo_data_loaders.data_length,
+        'output_size': taxo_data_loaders.num_labels,
     }
 
     # Add model-specific parameters based on model type
@@ -217,21 +254,13 @@ def check_available_devices():
 def main():
     check_available_devices()
     # Set up command line arguments
-    parser = argparse.ArgumentParser(description="Train taxonomy classification models")
-    parser.add_argument(
-        "--config", type=str, default="nanni_att_hparams.json", help="Path to hyperparameters JSON file"
-    )
-    #parser.add_argument('--config', type=str, default='kmer_hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument(
-        "--model_type",
-        type=str,
-        choices=["basic", "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2", "nanni_att"],
-        default="nanni_att",
-        help="Model type to train",
-    )
-    #parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn'], help='Model type to train')
+    parser = argparse.ArgumentParser(description='Train taxonomy classification models')
+    parser.add_argument('--config', type=str, default='hyperparams/kmer_hparams.json', help='Path to hyperparameters JSON file')
+    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att'],
+                       help='Model type to train')
     parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
     parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
+    parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
     args = parser.parse_args()
 
     # Load hyperparameters
@@ -251,8 +280,12 @@ def main():
         info(f"Detailed evaluation will run every {args.eval_freq} epochs")
         
     # Set default dataset path if not provided
-    if hparams["taxo_path"] == "":
-        hparams["taxo_path"] = get_default_dataset_path()
+    if hparams['parquets_path'] == "":
+        hparams['parquets_path'] = get_base_parquets_path()
+
+    if args.dataset_name:
+        hparams['dataset_name'] = args.dataset_name
+
 
     # Track timing
     t0 = time.time()
