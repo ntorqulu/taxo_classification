@@ -8,7 +8,6 @@ import time
 from torch.utils.tensorboard import SummaryWriter
 from models.architectures.base_model import BaseModel
 from dataset.utils import info
-from models.results import Results, compute_accuracy
 
 class Trainer:
     """Class for training and evaluating models."""

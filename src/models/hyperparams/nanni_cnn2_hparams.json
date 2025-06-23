@@ -1,6 +1,7 @@
 {
-    "taxo_path": "",
-    "max_rows": 10000,
+    "parquets_path": "",
+    "dataset_name": "filtered_ranks",
+    "max_rows": 1.0,
     "seed": 123,
     "epochs": 50,
     "batch_size": 30,
@@ -17,7 +18,7 @@
     "scheduler": "by_step",
     "every_n_epochs": 50,
 
-    "sequence_length": 313,
+     "seq_len_filter": 313,
     
     "dropout": 0.5,
     "use_batch_norm": true

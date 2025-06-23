@@ -15,8 +15,10 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
+from models.training.trainer import Trainer
 from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
+from typing import Any
 
 
 def init_device(seed: int = 42) -> torch.device:
