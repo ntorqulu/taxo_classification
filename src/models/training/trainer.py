@@ -8,7 +8,6 @@ import time
 from torch.utils.tensorboard import SummaryWriter
 from models.architectures.base_model import BaseModel
 from dataset.utils import info
-from models.results import Results, compute_accuracy
 
 class Trainer:
     """Class for training and evaluating models."""
@@ -73,6 +72,9 @@ class Trainer:
         
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(self.device), target.to(self.device)
+            if data.dim() == 3:  # [batch, 4, 313]
+                data = data.unsqueeze(1)  # [batch, 1, 4, 313]
+            # print(f"Epoch {epoch}, data dim {data.dim()}, data_shape {data.shape}, Batch size: {data.shape[0]}")
             
             # Zero gradients
             self.optimizer.zero_grad()
@@ -94,6 +96,11 @@ class Trainer:
             pred = output.argmax(dim=1)
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += target.size(0)
+            
+            # Log batch results
+            if batch_idx % 10 == 0:
+                info(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] '
+                     f'Loss: {loss.item():.6f}, Acc: {100. * correct / total:.2f}%')
                 
         # Compute averages
         avg_loss = total_loss / len(train_loader)
@@ -128,7 +135,8 @@ class Trainer:
         
         for data, target in val_loader:
             data, target = data.to(self.device), target.to(self.device)
-            
+            if data.dim() == 3:
+                data = data.unsqueeze(1)
             # Forward pass
             output = self.model(data)
             
@@ -198,91 +206,57 @@ class Trainer:
     
     @torch.no_grad()
     def compute_per_class_metrics(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Dict[str, float]:
-        """
-        Compute and log metrics for each class individually.
-        
-        Args:
-            data_loader: DataLoader for validation/test data
-            epoch: Current epoch number
-            prefix: Prefix for TensorBoard logs ('val' or 'test')
-            
-        Returns:
-            Dictionary with per-class metrics
-        """
+        """Compute per-class metrics in a single pass."""
         self.model.eval()
         
-        # Get number of classes from first batch
-        batch = next(iter(data_loader))
-        output = self.model(batch[0][:1].to(self.device))
-        num_classes = output.size(1)
-        
-        if epoch == 1 and prefix == 'val':
-            info(f"Class name mappings for {num_classes} classes:")
-            for class_idx in range(num_classes):
-                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
-                info(f"  Class index {class_idx} -> '{class_name}'")
-        
-        # Initialize counters for each class
+        # Initialize counters
+        num_classes = len(self.class_names) if self.class_names else 10  # fallback
         correct_per_class = torch.zeros(num_classes)
         total_per_class = torch.zeros(num_classes)
         loss_per_class = torch.zeros(num_classes)
         
-        # Process all batches
+        total_loss = 0.0
+        all_predictions = []
+        all_targets = []
+        
+        # Single pass through data
         for data, target in data_loader:
             data, target = data.to(self.device), target.view(-1).to(self.device)
+            data = self._prepare_input(data)
             
-            # Forward pass
             output = self.model(data)
             predictions = output.argmax(dim=1)
             
-            # Calculate metrics for each class
+            # Store for confusion matrix later
+            all_predictions.extend(predictions.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+            
+            # Calculate loss for each sample
+            losses = torch.nn.functional.cross_entropy(output, target, reduction='none')
+            
+            # Update per-class counters
             for class_idx in range(num_classes):
-                # Find samples with this class as ground truth
-                class_mask = (target == class_idx)
-                class_count = class_mask.sum().item()
-                
-                if class_count > 0:
-                    # Accuracy: correctly predicted / total for this class
-                    # Count correct predictions for this class
-                    correct = (predictions[class_mask] == class_idx).sum().item()
-                    correct_per_class[class_idx] += correct
-                    total_per_class[class_idx] += class_count
-                    
-                    # Loss: calculate separately using one-hot targets
-                    # Select only the relevant outputs
-                    relevant_outputs = output[class_mask]
-                    
-                    # Create targets for this class (all same class)
-                    class_targets = torch.full((class_count,), class_idx, 
-                                            device=self.device, dtype=torch.long)
-                    
-                    # Compute loss
-                    class_loss = self.criterion(relevant_outputs, class_targets)
-                    loss_per_class[class_idx] += class_loss.item() * class_count
+                mask = (target == class_idx)
+                if mask.sum() > 0:
+                    correct_per_class[class_idx] += (predictions[mask] == class_idx).sum()
+                    total_per_class[class_idx] += mask.sum()
+                    loss_per_class[class_idx] += losses[mask].sum()
         
-        # Calculate final metrics and log to TensorBoard
+        # Calculate final metrics
         metrics = {}
-        
         for class_idx in range(num_classes):
             if total_per_class[class_idx] > 0:
-                # Calculate metrics
                 accuracy = correct_per_class[class_idx] / total_per_class[class_idx]
                 avg_loss = loss_per_class[class_idx] / total_per_class[class_idx]
                 
-                # Store in return dict
                 metrics[f'class_{class_idx}_acc'] = accuracy.item()
                 metrics[f'class_{class_idx}_loss'] = avg_loss.item()
                 
-                # Get class name if available
-                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
-                
                 # Log to TensorBoard
+                class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Class {class_idx}"
                 self.writer.add_scalar(f'Class_{class_name}/Accuracy_{prefix}', accuracy, epoch)
                 self.writer.add_scalar(f'Class_{class_name}/Loss_{prefix}', avg_loss, epoch)
-                
-                # Also log class sample count to track class imbalance
-                self.writer.add_scalar(f'Class_{class_name}/Samples_{prefix}', total_per_class[class_idx], epoch)
-                
+        
         return metrics
 
     def log_confusion_matrix(self, data_loader: DataLoader, epoch: int, prefix: str = 'val'):
@@ -313,6 +287,8 @@ class Trainer:
         with torch.no_grad():
             for data, target in data_loader:
                 data, target = data.to(self.device), target.to(self.device)
+                if data.dim() == 3:
+                    data = data.unsqueeze(1)
                 output = self.model(data)
                 preds = output.argmax(dim=1)
                 
