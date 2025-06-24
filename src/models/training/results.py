@@ -1,82 +1,66 @@
-from matplotlib import pyplot as plt
-from torch import Tensor
-from dataset.utils import info, warn
+import numpy as np
+from typing import List, Dict, Union, Tuple, Any
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 
+def compute_accuracy(y_true, y_pred):
+    """
+    Compute accuracy from true and predicted labels.
+    
+    Args:
+        y_true: List or array of true labels
+        y_pred: List or array of predicted labels or logits
+    
+    Returns:
+        Accuracy as a float between 0 and 1
+    """
+    # If y_pred contains logits (has argmax method)
+    if hasattr(y_pred, 'argmax'):
+        preds = y_pred.argmax(-1)
+    else:
+        # y_pred already contains class predictions
+        preds = y_pred
+    
+    # Count correct predictions
+    correct = sum(1 for t, p in zip(y_true, preds) if t == p)
+    total = len(y_true)
+    
+    return correct / total if total > 0 else 0.0
 
-def compute_accuracy(outputs: Tensor, labels: Tensor) -> float:
-    preds = outputs.argmax(-1)
-    acc = (preds == labels.view_as(preds)).float().detach().cpu().numpy().mean()
-    return acc
+def compute_precision_recall_f1(y_true, y_pred, average='macro'):
+    """
+    Compute precision, recall, and F1 score.
+    
+    Args:
+        y_true: List or array of true labels
+        y_pred: List or array of predicted labels
+        average: Averaging method ('macro', 'micro', 'weighted')
+        
+    Returns:
+        Tuple of (precision, recall, f1)
+    """
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average=average, zero_division=0
+    )
+    
+    return precision, recall, f1
 
-
-class Results:
-    def __init__(self, epochs: int, name:str ="", log_interval: int = 10000):
-        self.name = name
-        self.max_epochs: int = epochs
-        self.losses: list[float] = []
-        self.accuracies: list[float] = []
-        self._current_losses: list[float] = []
-        self._current_accuracies: list[float] = []
-        self.log_interval: int = log_interval
-        self.last_log: int = 0
-
-    def __str__(self):
-        avg_acc = self.accuracies[-1]
-        avg_loss = self.losses[-1]
-        return f"{self.name}: Acc={avg_acc:.2f} L={avg_loss:.2f} "
-
-    @property
-    def current_epoch(self) -> int:
-        return len(self.losses) + 1
-
-    def new_epoch(self):
-        if len(self._current_losses) > 0:
-            last_loss = sum(self._current_losses)/len(self._current_losses)
-            last_acc = sum(self._current_accuracies) / len(self._current_accuracies)
-            self.losses.append(last_loss)
-            self.accuracies.append(last_acc)
-            self._current_losses = []
-            self._current_accuracies = []
-            info(f"{self.name} Avg Ac={last_acc:5.2f}  L={last_loss:5.2f}")
-        info(f"{self.name} Epoch {self.current_epoch}/{self.max_epochs}")
-
-    def finish(self):
-        self.new_epoch()
-
-    def append(self, loss: float, output, target):
-        self._current_losses.append(loss)
-        accuracy = compute_accuracy(output, target)
-        self._current_accuracies.append(accuracy)
-        if self.last_log:
-            self.last_log -= 1
-        else:
-            self.last_log = self.log_interval
-            info(f"{self.name} Ac={accuracy:5.2f} L={loss:5.2f}")
-
-
-def plot_results(results_list: list[Results], title: str = ""):
-    plt.figure()
-    plt.suptitle(title)
-
-    plt.subplot(2, 1, 1)
-    for results in results_list:
-        if len(results.accuracies) == 1:
-            plt.axhline(y=results.accuracies[0], color='green', label=results.name)
-        else:
-            plt.plot(results.accuracies, label=results.name)
-    plt.ylabel('Accuracy')
-    plt.ylim(0, 1)
-    plt.legend()
-
-    plt.subplot(2, 1, 2)
-    for results in results_list:
-        if len(results.losses) == 1:
-            plt.axhline(y=results.losses[0], color='green', label=results.name)
-        else:
-            plt.plot(results.losses, label=results.name)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-
-
-    plt.show()
+def compute_metrics(y_true, y_pred):
+    """
+    Compute all metrics: accuracy, precision, recall, and F1.
+    
+    Args:
+        y_true: List or array of true labels
+        y_pred: List or array of predicted labels
+        
+    Returns:
+        Dictionary with metrics
+    """
+    accuracy = compute_accuracy(y_true, y_pred)
+    precision, recall, f1 = compute_precision_recall_f1(y_true, y_pred)
+    
+    return {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
+    }
