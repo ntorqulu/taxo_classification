@@ -71,6 +71,9 @@ class Trainer:
         
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(self.device), target.to(self.device)
+            if data.dim() == 3:  # [batch, 4, 313]
+                data = data.unsqueeze(1)  # [batch, 1, 4, 313]
+            # print(f"Epoch {epoch}, data dim {data.dim()}, data_shape {data.shape}, Batch size: {data.shape[0]}")
             
             # Zero gradients
             self.optimizer.zero_grad()
@@ -92,6 +95,11 @@ class Trainer:
             pred = output.argmax(dim=1)
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += target.size(0)
+            
+            # Log batch results
+            if batch_idx % 10 == 0:
+                info(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] '
+                     f'Loss: {loss.item():.6f}, Acc: {100. * correct / total:.2f}%')
                 
         # Compute averages
         avg_loss = total_loss / len(train_loader)
@@ -225,13 +233,16 @@ class Trainer:
         all_predictions = []
         all_targets = []
         
-        # Process all batches
+        total_loss = 0.0
+        all_predictions = []
+        all_targets = []
+        
+        # Single pass through data
         for data, target in data_loader:
             data, target = data.to(self.device), target.view(-1).to(self.device)
             if data.dim() == 3:
                 data = data.unsqueeze(1)
             
-            # Forward pass
             output = self.model(data)
             predictions = output.argmax(dim=1)
             
@@ -312,6 +323,8 @@ class Trainer:
         with torch.no_grad():
             for data, target in data_loader:
                 data, target = data.to(self.device), target.to(self.device)
+                if data.dim() == 3:
+                    data = data.unsqueeze(1)
                 output = self.model(data)
                 preds = output.argmax(dim=1)
                 

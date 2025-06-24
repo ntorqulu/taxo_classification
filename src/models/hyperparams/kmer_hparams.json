@@ -28,6 +28,7 @@
   "num_filters": [64, 128, 256],
   "fc_sizes": [512, 256],
 
-  "fast_mode": false,
-  "eval_frequency": 1
+  "fast_mode": true,
+  "eval_frequency": 5,
+  "seq_len_filter": 313
 }
