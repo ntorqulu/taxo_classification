@@ -32,3 +32,8 @@ src/preprocessing/__pycache__/formatter.cpython-310.pyc
 # ignore checkpoints files
 /checkpoints/*
 data/dataset.csv
+
+# pycache files
+__pycache__/
+*.py[cod]
+*$py.class
