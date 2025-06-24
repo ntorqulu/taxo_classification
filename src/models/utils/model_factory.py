@@ -6,6 +6,7 @@ from models.architectures.base_model import BaseModel
 from models.architectures.basic_model import BasicTaxoModel
 from models.architectures.cnn_model import CNNModel
 from models.architectures.enhanced_mlp import EnhancedMLP
+from models.architectures.bert_model import BertDNAModel
 from models.architectures.nanni2024 import nanni_att, nanni_cnn1, nanni_cnn2
 
 
@@ -91,6 +92,22 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
             batch_size=kwargs.get("batch_size", 30),
             name=kwargs.get("name", "nanni_att"),
         )
+    
+    elif model_type == "bert_dna":
+        required_params = ["output_size"]
+        _check_required_params(required_params, kwargs)
+        return BertDNAModel(
+            sequence_length=kwargs.get("sequence_length", 313),
+            output_size=kwargs["output_size"],
+            hidden_size=kwargs.get("hidden_size", 256),
+            num_layers=kwargs.get("num_layers", 4),
+            num_heads=kwargs.get("num_heads", 8),
+            ff_dim=kwargs.get("ff_dim", 1024),
+            dropout=kwargs.get("dropout", 0.1),
+            pooling_type=kwargs.get("pooling_type", "mean"),
+            use_sinusoidal_pos=kwargs.get("use_sinusoidal_pos", True),
+            name=kwargs.get("name", "BarcodeTransformer"),
+        )
 
     else:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -128,5 +145,13 @@ def load_model(checkpoint_path: str, map_location: Optional[str] = None) -> Base
         return EnhancedMLP.load(checkpoint_path, map_location)
     elif "CNN" in model_name:
         return CNNModel.load(checkpoint_path, map_location)
+    elif "BertDNA" in model_name:
+        return BertDNAModel.load(checkpoint_path, map_location)
+    elif "nanni_cnn1" in model_name:
+        return nanni_cnn1.load(checkpoint_path, map_location)
+    elif "nanni_cnn2" in model_name:
+        return nanni_cnn2.load(checkpoint_path, map_location)
+    elif "nanni_att" in model_name:
+        return nanni_att.load(checkpoint_path, map_location)
     else:
         raise ValueError(f"Unknown model type in checkpoint: {model_name}")

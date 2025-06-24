@@ -1,0 +1,31 @@
+{
+    "parquets_path": "",
+    "dataset_name": "filtered_ranks",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 15,
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "label_column_name": "order_name",
+    "k": null,
+    "bits": 0,
+    
+    "model_type": "barcode_transformer",
+    "sequence_length": 313,
+    "hidden_size": 256,
+    "num_layers": 4,
+    "num_heads": 8,
+    "ff_dim": 1024,
+    "dropout": 0.1,
+    "pooling_type": "mean",
+    "use_sinusoidal_pos": true,
+    
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "cosine",
+    
+    "seq_len_filter": 313,
+    "fast_mode": true,
+    "eval_frequency": 5
+}

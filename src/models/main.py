@@ -145,6 +145,15 @@ def run_experiment(hparams: dict) -> dict:
 
     elif hparams.get("model_type") == "nanni_att":
         model_params["sequence_length"] = hparams.get("sequence_length", 313)
+    
+    elif hparams.get("model_type") == "bert_dna":
+        model_params["sequence_length"] = hparams.get("sequence_length", 313)
+        model_params["hidden_size"] = hparams.get("hidden_size", 256)
+        model_params["num_layers"] = hparams.get("num_layers", 4)
+        model_params["num_heads"] = hparams.get("num_heads", 8)
+        model_params["intermediate_size"] = hparams.get("intermediate_size", 512)
+        model_params["dropout"] = hparams.get("dropout", 0.1)
+        
 
     # Add experiment identifier to model name
     exp_id = hparams.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
@@ -258,7 +267,7 @@ def main():
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Train taxonomy classification models')
     parser.add_argument('--config', type=str, default='hyperparams/kmer_hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att'],
+    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att', 'bert_dna'],
                        help='Model type to train')
     parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
     parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
