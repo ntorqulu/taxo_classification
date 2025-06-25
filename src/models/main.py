@@ -141,7 +141,22 @@ def run_experiment(hparams: dict) -> dict:
     ).to(device)
     
     # Set up training components
-    criterion = nn.CrossEntropyLoss()
+
+    # Loss criterion
+    balancing_method = hparams.get('balancing_method', 'none')
+    if balancing_method == 'loss_soft':
+        info("Using balanced loss criterion (soft)")
+        weight = taxo_data_loaders.get_label_weights()
+        weight = weight.to(device)
+    elif balancing_method == 'loss_strong':
+        info("Using balanced loss criterion (strong")
+        weight = taxo_data_loaders.get_label_weights(strong=True)
+        weight = weight.to(device)
+    else:
+        info(f"Not using balanced loss criterion: {balancing_method}")
+        weight = None
+
+    criterion = nn.CrossEntropyLoss(weight=weight)
     
     # Select optimizer
     if hparams.get('optimizer', 'adam') == 'adam':
