@@ -12,4 +12,5 @@ biopython
 plotly
 # Uncomment the following line for Intel XPU support
 #--index-url https://download.pytorch.org/whl/xpu
-#torch
+torch
+tensorboard

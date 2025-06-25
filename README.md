@@ -70,7 +70,45 @@ python -m src.preprocessing.filter
 ```
 
 ### Testing the architechtures
+#### Hyperparams JSON
+To parse the different hyperparameters and the different options for each experiment a json can be used. When running the model you can parse the json with the option --config
 
+```
+$ PYTHONPATH=$(pwd)/src/ python src/models/main.py --config src/models/hyperparams/kmer_hparams.json --model_type basic
+```
+
+Such JSON can have the following keys:
+
+- batch_size
+- bits
+- dropout
+- epochs
+- eval_frequency
+- every_n_epochs
+- fast_mode
+- fc_sizes
+- hidden_size
+- input_size
+- k
+- kernel_sizes
+- label_column_name
+- learning_rate
+- max_rows
+- model_type
+- momentum
+- name
+- num_filters
+- optimizer
+- output_size
+- patience
+- scheduler
+- seed
+- seq_len_filter
+- sequence_length
+- taxo_path
+- use_batch_norm
+- use_scheduler
+- weight_decay
 
 
 # Preguntes a resoldre:

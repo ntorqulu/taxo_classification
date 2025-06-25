@@ -8,7 +8,7 @@
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
   "label_column_name": "order_name",
-  "k": 2,
+  "k": 4,
   "bits": null,
   "hidden_size": null,
   
@@ -30,5 +30,6 @@
   "fc_sizes": [512, 256],
 
   "fast_mode": true,
-  "eval_frequency": 5
+  "eval_frequency": 5,
+  "seq_len_filter": 313
 }
