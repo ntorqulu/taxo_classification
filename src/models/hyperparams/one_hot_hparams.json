@@ -13,6 +13,7 @@
   "hidden_size": null,
   
   "model_type": "enhanced_mlp",
+  "balancing_method": "none",
   "optimizer": "adam",
   "use_scheduler": true,
   "scheduler": "plateau",

@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import torch
+from torch import Tensor
+
 from dataset.taxo_dataset import TaxoDataset
 from torch.utils.data import random_split, Subset, DataLoader
 from dataset.utils import warn
@@ -99,6 +101,57 @@ class TaxoDataLoaders:
             assert sum(l[0] for l in labels[name].values()) == len_ds
             assert abs(sum(l[1] for l in labels[name].values()) - 1.0) < 0.1
         return labels
+
+    def get_label_weights(self,
+                          normalize: bool = True,
+                          strong: bool = False,
+                          min_frequency: float = 1.,
+                          ) -> Tensor:
+        """
+        Computes label weights for the training dataset based on specified parameters.
+
+        This method calculates the weights for each label in the dataset to be used during training.
+        The weights can be adjusted for normalization, a stronger inverse relationship with frequency,
+        and a minimum frequency threshold to prevent overly high weights for infrequent labels.
+
+        Parameters
+        ----------
+        normalize : bool, optional
+            If True, normalizes the label weights such that the sum of weighted samples matches
+            the size of the training dataset. The default is True.
+        strong : bool, optional
+            If True, computes weights as the inverse square of the label frequency, resulting in
+            a stronger penalty for frequent labels. The default is False.
+        min_frequency : float, optional
+            The minimum frequency threshold to clamp label counts. Any label frequency below this
+            value is treated as this value to avoid excessively high weights for rare labels.
+            The default is 10.
+
+        Returns
+        -------
+        torch.Tensor
+            A tensor containing the computed label weights for the training dataset.
+        """
+        len_ds = len(self.train_dataset)
+        label_ids = [self.taxo_dataset.get_label_id(idx) for idx in self.train_dataset.indices]
+        label_ids_counts = Counter(label_ids)
+
+        # Ensure all possible class IDs are represented (even if count is 0)
+        num_labels = self.taxo_dataset.num_labels
+        label_counts = [label_ids_counts.get(i, 0) for i in range(num_labels)]
+        label_counts = torch.tensor(label_counts, dtype=torch.float32)
+        label_counts = torch.clamp(label_counts, min=min_frequency)
+
+        if strong:
+            label_weights = 1. / (label_counts ** 2)
+        else:
+            label_weights = 1. / label_counts
+
+        if normalize:
+            total_weighted_samples = torch.sum(label_weights * label_counts)
+            label_weights = label_weights * len_ds / total_weighted_samples
+
+        return label_weights
 
     @property
     def data_loaders(self) -> (DataLoader, DataLoader, DataLoader):

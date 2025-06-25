@@ -23,6 +23,30 @@ TAXONOMY_LABELS: dict[str, list[str]]= {
     ],
 }
 
+
+def get_class_id(level_name: str, value: str) -> int:
+    if level_name not in TAXONOMY_LABELS:
+        raise ValueError(f"Invalid taxonomic level: {level_name}")
+    if value not in TAXONOMY_LABELS[level_name]:
+        raise ValueError(f"Invalid value for {level_name}: {value}")
+    class_id = TAXONOMY_LABELS[level_name].index(value)
+    return class_id
+
+
+def get_class_name(level_name: str, class_id: int) -> str:
+    if level_name not in TAXONOMY_LABELS:
+        raise ValueError(f"Invalid taxonomic level: {level_name}")
+    if class_id < 0 or class_id >= len(TAXONOMY_LABELS[level_name]):
+        raise ValueError(f"Invalid class_id: {class_id}")
+    class_name = TAXONOMY_LABELS[level_name][class_id]
+    return class_name
+
+def get_max_class_id(level_name: str) -> int:
+    if level_name not in TAXONOMY_LABELS:
+        raise ValueError(f"Invalid taxonomic level: {level_name}")
+    return len(TAXONOMY_LABELS[level_name]) - 1
+
+
 TAXONOMY_LEVELS: list[str] = list(TAXONOMY_LABELS.keys())
 
 def wrong_class_values(level_name: str, values: list | dict) -> None | dict[str, list[str]]:
