@@ -197,8 +197,8 @@ def run_experiment(hparams: dict) -> dict:
     )
     log_dir = os.path.join("runs", run_name)
     if hparams.get("from_checkpoint", False):
-        from_checkpoint_path = hparams.get("from_checkpoint_path", "")
-        if from_checkpoint_path == "":
+        from_checkpoint_path = hparams.get("from_checkpoint_path", None)
+        if from_checkpoint_path is None:
             raise ValueError("If from_checkpoint is True, from_checkpoint_path must be given.")
     else:
         from_checkpoint_path = None
