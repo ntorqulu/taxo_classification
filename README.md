@@ -87,6 +87,8 @@ Such JSON can have the following keys:
 - every_n_epochs
 - fast_mode
 - fc_sizes
+- from_checkpoint
+- from_checkpoint_path
 - hidden_size
 - input_size
 - k

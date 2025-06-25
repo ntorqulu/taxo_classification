@@ -196,6 +196,13 @@ def run_experiment(hparams: dict) -> dict:
         else f"{model.name}_{hparams['label_column_name']}_bits{hparams['bits']}"
     )
     log_dir = os.path.join("runs", run_name)
+    if hparams.get("from_checkpoint", False):
+        from_checkpoint_path = hparams.get("from_checkpoint_path", "")
+        if from_checkpoint_path == "":
+            raise ValueError("If from_checkpoint is True, from_checkpoint_path must be given.")
+    else:
+        from_checkpoint_path = None
+        
     checkpoint_dir = os.path.join("checkpoints", run_name)
 
     class_names = get_class_names(hparams["label_column_name"])
@@ -223,6 +230,8 @@ def run_experiment(hparams: dict) -> dict:
         log_dir=log_dir,
         checkpoint_dir=checkpoint_dir,
         class_names=class_names,
+        from_checkpoint=hparams.get("from_checkpoint", False),
+        from_checkpoint_path=from_checkpoint_path,
     )
 
     # Train model
