@@ -282,12 +282,14 @@ def main():
 
     # Load hyperparameters
     with open(args.config, "r") as f:
+        info(f"Using configuration file {args.config}")
         hparams = json.load(f)
 
     # Override with command line arguments if provided
     if args.model_type:
         hparams['model_type'] = args.model_type
-    
+        info(f"Model type: {args.model_type}")
+
     if args.fast:
         hparams['fast_mode'] = True
         info("Fast evaluation mode enabled")
