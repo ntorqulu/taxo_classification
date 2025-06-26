@@ -235,15 +235,39 @@ class TaxoDataset(Dataset):
         if idx >= len(self):
             raise IndexError(f"Index {idx} is higher than the maximum number of rows ({len(self)})")
 
-        # Get the row index for the whole subset
         if self._filter_indexes:
             idx = self._filter_indexes[idx]
 
-        # Gete the encoding value to return
-        encoding = self._df_encoding.iloc[idx, 0]
-        encoding = torch.tensor(encoding, dtype=torch.float32)
+        # Check if this is 4-row encoding by looking at available columns
+        encoding_columns = self._df_encoding.columns
+        
+        if any(col.startswith('4row_') for col in encoding_columns):
+            # This is 4-row encoding - get all 4 rows
+            row1 = self._df_encoding.iloc[idx]["4row_1"]
+            row2 = self._df_encoding.iloc[idx]["4row_2"] 
+            row3 = self._df_encoding.iloc[idx]["4row_3"]
+            row4 = self._df_encoding.iloc[idx]["4row_4"]
+            
+            # Parse strings if needed and convert to tensors
+            rows = []
+            for row in [row1, row2, row3, row4]:
+                if isinstance(row, str):
+                    import ast
+                    row = ast.literal_eval(row)
+                rows.append(torch.tensor(row, dtype=torch.float32))
+            
+            # Stack to create [4, 313] tensor
+            encoding = torch.stack(rows, dim=0)
+            
+        else:
+            # Handle other encoding types (k-mer, bit, etc.)
+            encoding = self._df_encoding.iloc[idx, 0]
+            if isinstance(encoding, str):
+                import ast
+                encoding = ast.literal_eval(encoding)
+            encoding = torch.tensor(encoding, dtype=torch.float32)
 
-        # Get the label id as a tensor
+        # Get label
         label_row = self._df.iloc[idx]
         label = label_row[self.label_column_name]
         label = self._labels_ids[label]
