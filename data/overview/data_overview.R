@@ -7,9 +7,26 @@ data$sequence <- toupper(data$sequence)
 
 library(stringr)
 
-data <- data[str_length(data$sequence) %in% 290:320,] 
+# data <- data[str_length(data$sequence) %in% 290:320,] 
+data <- data[str_length(data$sequence) %in% 313,] 
 
 data <- data[!grepl('N|Y|R|W|K|S|M|D', data$sequence),]
+
+hist <- as.data.frame(sort(table(data$family_name),decreasing =
+ T))
+
+hist <- hist[hist$Freq > 5,]
+hist$Var2 <- 1:dim(hist)[1]
+hist$percent <- hist$Freq / sum(hist$Freq) * 100
+hist$percent_accumulated <- cumsum(hist$percent)
+
+
+
+library(ggplot2)
+ggplot(hist[hist$percent_accumulated < 95,], aes(x = Var2, y = log(Freq))) +
+  geom_line() +
+  scale_x_continuous(breaks = hist$Var2, labels = hist$Var1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 # > as.data.frame(sort(table(data$kingdom_name),decreasing = T))
 #            Var1   Freq
