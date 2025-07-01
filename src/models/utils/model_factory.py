@@ -6,7 +6,7 @@ from models.architectures.base_model import BaseModel
 from models.architectures.basic_model import BasicTaxoModel
 from models.architectures.cnn_model import CNNModel
 from models.architectures.enhanced_mlp import EnhancedMLP
-from models.architectures.nanni2024 import nanni_att, nanni_cnn1, nanni_cnn2
+from models.architectures.nanni2024 import nanni_att, nanni_att_kmer, nanni_cnn1, nanni_cnn2
 
 
 def create_model(model_type: str, **kwargs) -> BaseModel:
@@ -90,6 +90,19 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
             hidden_size=kwargs.get("hidden_size", 100),
             batch_size=kwargs.get("batch_size", 30),
             name=kwargs.get("name", "nanni_att"),
+        )
+
+    elif model_type == "nanni_att_kmer":
+        required_params = ["output_size"]
+        _check_required_params(required_params, kwargs)
+        return nanni_att_kmer(
+            input_size=kwargs.get("input_size"),
+            output_size=kwargs["output_size"],
+            num_heads=kwargs.get("num_heads", 8),
+            embed_dim=kwargs.get("embed_dim", 64),
+            hidden_size=kwargs.get("hidden_size", 100),
+            batch_size=kwargs.get("batch_size", 30),
+            name=kwargs.get("name", f"nanni_att_{kwargs.get("k")}mer"),
         )
 
     else:
