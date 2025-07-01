@@ -156,28 +156,6 @@ class nanni_cnn2(BaseModel):
         model.load_state_dict(checkpoint["model_state_dict"])
         return model
 
-    def get_config(self) -> Dict[str, Any]:
-        config = super().get_config()
-        config.update(
-            {"sequence_length": self.sequence_length, "hidden_size": self.hidden_size, "output_size": self.output_size}
-        )
-        return config
-
-    @classmethod
-    def load(cls, path: str, map_location: Optional[str] = None) -> "nanni_cnn2":
-        checkpoint = torch.load(path, map_location=map_location)
-        config = checkpoint["model_config"]
-
-        model = cls(
-            sequence_length=config["sequence_length"],
-            hidden_size=config["hidden_size"],
-            output_size=config["output_size"],
-            name=config.get("name", "nanni_cnn2"),
-        )
-
-        model.load_state_dict(checkpoint["model_state_dict"])
-        return model
-
 
 class nanni_att(BaseModel):
     # - flattenConverts the multi-dimensional input into a 1D
@@ -198,7 +176,7 @@ class nanni_att(BaseModel):
     def __init__(
         self,
         sequence_length: int,
-        output_size=int,
+        output_size: int,
         num_heads: int = 8,
         embed_dim: int = 64,
         hidden_size: int = 100,

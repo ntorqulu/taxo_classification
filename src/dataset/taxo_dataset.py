@@ -293,6 +293,11 @@ class TaxoDataset(Dataset):
         assert isinstance(label, str), label
         return label
 
+    def get_label_id(self, idx: int) -> int:
+        label = self.get_label(idx)
+        label_id  = self._labels_ids[label]
+        return label_id
+
     def get_sequence(self, idx: int) -> str:
         sequence = self._get_column_value(idx, CachedDataFrame.SEQUENCE_COLUMN_NAME)
         assert isinstance(sequence, str), sequence

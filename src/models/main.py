@@ -152,8 +152,23 @@ def run_experiment(hparams: dict) -> dict:
     model = create_model(model_type=hparams.get("model_type", "basic"), **model_params).to(device)
 
     # Set up training components
-    criterion = nn.CrossEntropyLoss()
 
+    # Loss criterion
+    balancing_method = hparams.get('balancing_method', 'none')
+    if balancing_method == 'loss_soft':
+        info("Using balanced loss criterion (soft)")
+        weight = taxo_data_loaders.get_label_weights()
+        weight = weight.to(device)
+    elif balancing_method == 'loss_strong':
+        info("Using balanced loss criterion (strong")
+        weight = taxo_data_loaders.get_label_weights(strong=True)
+        weight = weight.to(device)
+    else:
+        info(f"Not using balanced loss criterion: {balancing_method}")
+        weight = None
+
+    criterion = nn.CrossEntropyLoss(weight=weight)
+    
     # Select optimizer
     if hparams.get("optimizer", "adam") == "adam":
         optimizer = torch.optim.Adam(
@@ -276,11 +291,13 @@ def main():
 
     # Load hyperparameters
     with open(args.config, "r") as f:
+        info(f"Using configuration file {args.config}")
         hparams = json.load(f)
 
     # Override with command line arguments if provided
     if args.model_type:
-        hparams["model_type"] = args.model_type
+        hparams['model_type'] = args.model_type
+        info(f"Model type: {args.model_type}")
 
     if args.fast:
         hparams["fast_mode"] = True
