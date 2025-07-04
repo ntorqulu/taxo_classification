@@ -14,3 +14,5 @@ plotly
 #--index-url https://download.pytorch.org/whl/xpu
 torch
 tensorboard
+transformers
+tokenizers

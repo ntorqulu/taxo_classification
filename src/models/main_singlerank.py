@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from models.training.trainer import Trainer
+from models.training.singlerank_trainer import Trainer
 from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
 from typing import Any
@@ -66,7 +66,8 @@ def run_experiment(hparams: dict) -> dict:
         bits=hparams["bits"],
         batch_size=hparams["batch_size"],
         max_rows=hparams["max_rows"],
-        seq_len_filter=hparams.get("seq_len_filter", None)
+        seq_len_filter=hparams.get("seq_len_filter", None),
+        use_bert_collate=(hparams.get("model_type", "basic") == "bert")
     )
 
     # Validate labels
@@ -145,6 +146,15 @@ def run_experiment(hparams: dict) -> dict:
 
     elif hparams.get("model_type") == "nanni_att":
         model_params["sequence_length"] = hparams.get("sequence_length", 313)
+
+    elif hparams.get("model_type") == "bert":
+        model_params["vocab_size"] = hparams.get("vocab_size", 5)
+        model_params["max_length"] = hparams.get("max_length", 512)
+        model_params["hidden_size"] = hparams.get("hidden_size", 256)
+        model_params["num_layers"] = hparams.get("num_layers", 6)
+        model_params["num_heads"] = hparams.get("num_heads", 8)
+        model_params["dropout"] = hparams.get("dropout", 0.3)
+        model_params["classifier_hidden_size"] = hparams.get("classifier_hidden_size", 256)
 
     # Add experiment identifier to model name
     exp_id = hparams.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
@@ -273,7 +283,7 @@ def main():
     # Set up command line arguments
     parser = argparse.ArgumentParser(description='Train taxonomy classification models')
     parser.add_argument('--config', type=str, default='hyperparams/kmer_hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att'],
+    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att', 'bert'],
                        help='Model type to train')
     parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
     parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')

@@ -7,6 +7,7 @@ from dataset.taxo_dataset import TaxoDataset
 from torch.utils.data import random_split, Subset, DataLoader
 from dataset.utils import warn
 from collections import Counter
+from typing import List, Tuple
 
 
 class TaxoDataLoaders:
@@ -23,6 +24,7 @@ class TaxoDataLoaders:
                  bits: int = None,
                  seq_len_filter: int | None = None,
                  stratify = None,
+                 use_bert_collate: bool = False,
                  ):
 
         self.taxo_dataset = TaxoDataset(parquets_path=parquets_path,
@@ -44,22 +46,32 @@ class TaxoDataLoaders:
         self.train_dataset, self.eval_dataset, self.test_dataset = random_split(self.dataset,
                                                                                 [train_size, eval_size, test_size])
 
+        # Use BERT collate function if specified
+        collate_fn = bert_collate_fn if use_bert_collate else None
+        num_workers = 0 if use_bert_collate else 4  # Avoid multiprocessing issues with BERT
+
         self.train_loader = torch.utils.data.DataLoader(
             dataset=self.train_dataset,
             batch_size=batch_size,
-            shuffle=True
+            shuffle=True,
+            collate_fn=collate_fn,
+            num_workers=num_workers
         )
 
         self.eval_loader = torch.utils.data.DataLoader(
             dataset=self.eval_dataset,
             batch_size=batch_size,
-            shuffle=True
+            shuffle=True,
+            collate_fn=collate_fn,
+            num_workers=num_workers
         )
 
         self.test_loader = torch.utils.data.DataLoader(
             dataset=self.test_dataset,
             batch_size=batch_size,
-            shuffle=True
+            shuffle=True,
+            collate_fn=collate_fn,
+            num_workers=num_workers
         )
 
     def _init_max_rows(self, max_rows: int | float) -> int:
@@ -176,5 +188,68 @@ class TaxoDataLoaders:
     @property
     def max_sequence_len(self) -> int:
         return self.taxo_dataset.max_sequence_len
+
+
+def bert_collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Custom collate function for BERT model to handle 4-row encoding tensors.
+    
+    Args:
+        batch: List of (data, target) tuples
+        
+    Returns:
+        Tuple of (data_batch, target_batch)
+    """
+    data_list = []
+    target_list = []
+    
+    for data, target in batch:
+        data_list.append(data)
+        target_list.append(target)
+    
+    # Stack targets
+    target_batch = torch.cat(target_list, dim=0)
+    
+    # For 4-row encoding, we need to pad sequences to the same length
+    if data_list[0].dim() == 2 and data_list[0].shape[0] == 4:
+        # 4-row encoding: [4, seq_len]
+        max_seq_len = max(data.shape[1] for data in data_list)
+        batch_size = len(data_list)
+        
+        # Create padded tensor
+        padded_data = torch.zeros(batch_size, 4, max_seq_len, dtype=torch.float32)
+        
+        for i, data in enumerate(data_list):
+            seq_len = data.shape[1]
+            padded_data[i, :, :seq_len] = data
+        
+        data_batch = padded_data
+    else:
+        # For other encodings (k-mer), just stack
+        data_batch = torch.stack(data_list, dim=0)
+    
+    return data_batch, target_batch
+
+
+def create_bert_dataloader(dataset, batch_size: int = 32, shuffle: bool = True, num_workers: int = 0):
+    """
+    Create a DataLoader for BERT models with the custom collate function.
+    
+    Args:
+        dataset: The dataset to load
+        batch_size: Batch size
+        shuffle: Whether to shuffle the data
+        num_workers: Number of worker processes (set to 0 to avoid multiprocessing issues)
+        
+    Returns:
+        DataLoader instance
+    """
+    return DataLoader(
+        dataset, 
+        batch_size=batch_size, 
+        shuffle=shuffle, 
+        num_workers=num_workers,  # Set to 0 to avoid multiprocessing issues
+        collate_fn=bert_collate_fn
+    )
 
 

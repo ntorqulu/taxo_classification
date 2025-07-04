@@ -12,7 +12,7 @@
   "bits": null,
   "hidden_size": null,
   
-  "model_type": "basic",
+  "model_type": "hierarchical",
   "balancing_method": "none",
   "optimizer": "adam",
   "use_scheduler": true,
@@ -21,15 +21,26 @@
   "scheduler_factor": 0.5,
   "patience": 5,
   
-  "hidden_sizes": [256, 128],
-  "dropout": 0.2,
-  "use_batch_norm": true,
+  "shared_hidden_sizes": [512, 256],
+  "level_specific_sizes": {
+    "kingdom_name": [128, 64],
+    "phylum_name": [128, 64],
+    "class_name": [128, 64],
+    "order_name": [128, 64]
+  },
+  "dropout": 0.3,
   
-  "kernel_sizes": [3, 5, 7],
-  "num_filters": [64, 128, 256],
-  "fc_sizes": [512, 256],
+  "level_weights": {
+    "kingdom_name": 1.0,
+    "phylum_name": 1.2,
+    "class_name": 1.4,
+    "order_name": 1.6
+  },
+  "loss_type": "cross_entropy",
+  "focal_alpha": 1.0,
+  "focal_gamma": 2.0,
 
   "fast_mode": true,
   "eval_frequency": 5,
   "seq_len_filter": 313
-}
+} 

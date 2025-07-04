@@ -1,0 +1,41 @@
+{
+  "parquets_path": "",
+  "dataset_name": "filtered_ranks",
+  "max_rows": 1.0,
+  "seed": 123,
+  "epochs": 15,
+  "batch_size": 30,
+  "learning_rate": 0.001,
+  "weight_decay": 1e-5,
+  "label_column_name": "order_name",
+  "k": 4,
+  "bits": null,
+  "hidden_size": null,
+  
+  "model_type": "gnn_hierarchical",
+  "balancing_method": "none",
+  "optimizer": "adam",
+  "use_scheduler": true,
+  "scheduler": "plateau",
+  "scheduler_patience": 3,
+  "scheduler_factor": 0.5,
+  "patience": 5,
+  
+  "hidden_sizes": [256, 128],
+  "gnn_layers": 2,
+  "use_attention": true,
+  "dropout": 0.3,
+  
+  "level_weights": {
+    "kingdom_name": 1.0,
+    "phylum_name": 1.2,
+    "class_name": 1.4,
+    "order_name": 1.6
+  },
+  "graph_weight": 0.1,
+  "consistency_weight": 0.05,
+
+  "fast_mode": true,
+  "eval_frequency": 5,
+  "seq_len_filter": 313
+} 

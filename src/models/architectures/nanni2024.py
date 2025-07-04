@@ -9,8 +9,8 @@ from models.architectures.base_model import BaseModel
 
 
 class nanni_cnn1(BaseModel):
-    # - Convolution2d(3, 16, ‘Padding’, ‘same’): The size of the convolutional kernel/filter is
-    # 3 × 3. The number of filters is 16. ‘Padding’, ‘same’ means the padding is set so that
+    # - Convolution2d(3, 16, 'Padding', 'same'): The size of the convolutional kernel/filter is
+    # 3 × 3. The number of filters is 16. 'Padding', 'same' means the padding is set so that
     # the spatial dimensions of the input and output feature maps are the same.
     #      -- modification to adapt to the 4X320 input size:
     # - Batch normalization: The output of the previous layer is normalized, thus helping
@@ -73,11 +73,11 @@ class nanni_cnn1(BaseModel):
 
 
 class nanni_cnn2(BaseModel):
-    # - Convolution2d(5, 16, ‘Padding’, ‘same’): The size of the convolutional kernel/filter is
-    # 5 × 5. The number of filters is 16. ‘Padding’, ‘same’ means the padding is set so that
+    # - Convolution2d(5, 16, 'Padding', 'same'): The size of the convolutional kernel/filter is
+    # 5 × 5. The number of filters is 16. 'Padding', 'same' means the padding is set so that
     # the spatial dimensions of the input and output feature maps are the same.
     # - Relu: Rectified Linear Unit activation layer.
-    # - Convolution2d(5, 36, ‘Padding’, ‘same’): CNN2 has another convolutional layer with
+    # - Convolution2d(5, 36, 'Padding', 'same'): CNN2 has another convolutional layer with
     # size 5 × 5. The number of filters is 36.
     # - Relu: Another ReLU activation layer.
     # - Max pooling2d(2): This is a max pooling layer with a 2 × 2 pool size. Max pooling
@@ -85,7 +85,7 @@ class nanni_cnn2(BaseModel):
     # - Dropout(0.2): CNN2 also has a dropout layer with a dropout rate 0.2.
     # - Relu: Another ReLU activation layer.
     # - Fully connected(1024/reduce). A fully connected layer with 1024/reduce output
-    # neurons. The value of reduce is related to the dataset. We set it to ‘1’ and increase the
+    # neurons. The value of reduce is related to the dataset. We set it to '1' and increase the
     # value if and when encountering a GPU memory problem.
     # - Relu: ReLU activation layer.
     # - Fully connectedLayer(1024/reduce). Another fully connected layer/reducer with 1024
@@ -193,7 +193,7 @@ class nanni_att(BaseModel):
 
         self.flatten = nn.Flatten()
         self.input_projection = nn.Linear(4, self.embed_dim)
-        # self.input_projection = nn.Linear(self.sequence_length * 4, self.embed_dim)
+        self.vector_projection = None  # Will be initialized on first forward if needed
         self.self_attention = nn.MultiheadAttention(
             embed_dim=self.embed_dim, num_heads=self.num_heads, batch_first=True
         )
@@ -205,13 +205,34 @@ class nanni_att(BaseModel):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.squeeze(1)
-        x = x.permute(2, 0, 1)
-        x = self.input_projection(x)
+        # Handle 4-row/one-hot encoding: [batch, 4, seq_len] or [batch, 1, 4, seq_len]
+        if x.dim() == 4 and x.shape[1] == 1:
+            x = x.squeeze(1)
+        if x.dim() == 3 and x.shape[1] == 4:
+            # [batch, 4, seq_len] -> [batch, seq_len, 4]
+            x = x.permute(0, 2, 1)
+            # Project each position (4) to embed_dim
+            x = self.input_projection(x)
+            # Now x: [batch, seq_len, embed_dim]
+        elif x.dim() == 2:
+            # [batch, features] (k-mer or bit encoding)
+            # Project to a sequence of length 1 (or more, if desired)
+            if self.vector_projection is None or self.vector_projection.in_features != x.shape[1]:
+                # Lazy init to match input size
+                self.vector_projection = nn.Linear(x.shape[1], self.embed_dim).to(x.device)
+            # [batch, features] -> [batch, 1, embed_dim]
+            x = self.vector_projection(x).unsqueeze(1)
+        else:
+            raise ValueError(f"Unsupported input shape for nanni_att: {x.shape}")
+
+        # Self-attention
         x, attn_weights = self.self_attention(x, x, x)
+        # BiLSTM
         x, _ = self.bilstm(x)
-        x = x.permute(1, 2, 0)
+        # [batch, seq_len, 2*hidden_size] -> [batch, 2*hidden_size, seq_len]
+        x = x.permute(0, 2, 1)
         x = self.batch_norm(x)
+        # Global average pooling over sequence length
         x = torch.mean(x, dim=2)
         x = self.fc(x)
         # Remove softmax from forward pass
