@@ -19,7 +19,9 @@ class Trainer:
                 scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
                 log_dir: Optional[str] = None,
                 checkpoint_dir: Optional[str] = None,
-                class_names: Optional[List[str]] = None):
+                class_names: Optional[List[str]] = None,
+                from_checkpoint: bool = False,
+                from_checkpoint_path: Optional[str] = None):
         """
         Initialize trainer.
         
@@ -39,6 +41,8 @@ class Trainer:
         self.device = device
         self.scheduler = scheduler
         self.class_names = class_names if class_names is not None else []
+        self.from_checkpoint = from_checkpoint
+        self.from_checkpoint_path = from_checkpoint_path
         
         # Create mapping from index to class name for easier lookup
         self.class_idx_to_name = {idx: name for idx, name in enumerate(self.class_names)} if self.class_names else {}
@@ -689,7 +693,18 @@ class Trainer:
         t0 = time.time()
         info(f"Starting training for {epochs} epochs in {'fast' if fast_mode else 'standard'} mode")
         
-        for epoch in range(1, epochs + 1):
+        if self.from_checkpoint:
+            if self.from_checkpoint_path is None:
+                raise ValueError("from_checkpoint_path must be provided when from_checkpoint is True")
+            if not os.path.exists(self.from_checkpoint_path):
+                raise FileNotFoundError(f"Checkpoint file '{self.from_checkpoint_path}' does not exist")
+            self.load_checkpoint(self.from_checkpoint_path)
+            info(f"Loaded model from checkpoint: {self.from_checkpoint_path}")
+            start_epoch = self.epoch_checkpoint + 1
+        else:
+            start_epoch = 1
+
+        for epoch in range(start_epoch, epochs + 1):
             # Train one epoch
             train_loss, train_acc = self.train_epoch(train_loader, epoch)
             history['train_loss'].append(train_loss)
@@ -867,3 +882,19 @@ class Trainer:
         if is_best:
             best_filename = f"{self.model.name}_best.pt"
             torch.save(checkpoint, os.path.join(self.checkpoint_dir, best_filename))
+        
+    def load_checkpoint(self, filename: str) -> None:
+        """
+        Load model checkpoint.
+
+        Args:
+            filename: Checkpoint file name
+        """
+        checkpoint = torch.load(filename)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if self.scheduler is not None:
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        if hasattr(self.model, 'set_config'):
+            self.model.set_config(checkpoint['model_config'])
+        self.epoch_checkpoint = checkpoint['epoch']
