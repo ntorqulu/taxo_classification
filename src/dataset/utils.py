@@ -38,6 +38,7 @@ def get_parquet_file_path(parquets_path: Path = get_base_parquets_path(),
     if k is None and bits is None:
         pattern = 'dataset*.parquet'
         files = list(parquets_path.glob(pattern))
+        assert files, f"No files found in {parquets_path} for pattern: {pattern}"
         file = [min(files, key=lambda f: len(f.name))]
     elif k is not None:
         pattern = f'dataset*_kmer_{k}.parquet'
