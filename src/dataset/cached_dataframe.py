@@ -1,8 +1,10 @@
 import os
 import gc
+from collections import Counter
+
 import pandas as pd
 from pathlib import Path
-from dataset.utils import info, warn, get_parquet_file_path
+from dataset.utils import info, get_parquet_file_path
 
 class CachedDataFrame:
     _df: pd.DataFrame | None = None
@@ -11,6 +13,7 @@ class CachedDataFrame:
     _bits_encodings: dict[int, pd.DataFrame] = {}
 
     SEQUENCE_COLUMN_NAME = 'sequence'
+    LEVEL_COLUMN_NAME_SUFIX = '_name'
 
     @classmethod
     def flush_encodings_cache(cls):
@@ -57,6 +60,7 @@ class CachedDataFrame:
                                         "Please build the Parquet files first using the  ParquetBuilder class")
             cls._df = pd.read_parquet(parquet_file_path)
             cls._parquet_file_path = parquet_file_path
+            info(f"Level column names: {', '.join(cls.get_level_column_names())}")
         elif cls._parquet_file_path != parquet_file_path:
             raise RuntimeError(f"Cached path differs on provided: {parquet_file_path}")
         return cls._df
@@ -89,6 +93,12 @@ class CachedDataFrame:
         return df
 
     @classmethod
+    def get_level_column_names(cls) -> list[str]:
+        assert CachedDataFrame._df is not None
+        lcn = [c for c in CachedDataFrame._df.columns if c.endswith(CachedDataFrame.LEVEL_COLUMN_NAME_SUFIX)]
+        return lcn
+
+    @classmethod
     def get_length(cls) -> int:
         return len(cls._df)
 
@@ -100,3 +110,19 @@ class CachedDataFrame:
     def get_max_sequence_len(cls) -> int:
         return cls._df[cls.SEQUENCE_COLUMN_NAME].astype(str).str.len().max()
 
+    @classmethod
+    def get_column_cardinality(cls, column_name: str) -> dict[str, int]:
+        assert CachedDataFrame._df is not None, "Please load the dataset first"
+        assert column_name in cls.get_level_column_names(), f"{column_name} is not a level column name "
+        all_values = cls._df[column_name].tolist()
+        cardinality = Counter(all_values)
+        cardinality = dict(cardinality)
+        cardinality = dict(sorted(cardinality.items(), key=lambda x: x[1], reverse=True))  # Order by value desc
+        return dict(cardinality)
+
+    @classmethod
+    def log_level_cardinalities(cls):
+        for column_name in cls.get_level_column_names():
+            if column_name == "scientific_name":
+                continue
+            info(f"{column_name}: { cls.get_column_cardinality(column_name)}")

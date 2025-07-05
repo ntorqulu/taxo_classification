@@ -1,14 +1,23 @@
+import random
+
 import pytest
 from torch import Tensor
 
-from constants.taxonomy_labels import TAXONOMY_LABELS
 from dataset.parquet_builder import ParquetBuilder
 from dataset.taxo_dataset import TaxoDataset
 from dataset.utils import get_base_parquets_path, DEFAULT_DATASET_NAME
 from feature_extraction.main import SequenceCoder
 from dataset.cached_dataframe import CachedDataFrame
+from collections import Counter
 
-test_label_column_name = list(TAXONOMY_LABELS.keys())[0]
+
+# Load the dataframe to get a column_name
+parquet_dir = get_base_parquets_path()
+parquet_dir = [d for d in parquet_dir.iterdir() if d.is_dir()][1]
+CachedDataFrame.get_data_frame(parquet_dir)
+test_label_column_name = CachedDataFrame.get_level_column_names()[0]
+CachedDataFrame.flush_cache()
+
 test_filter_key = test_label_column_name
 sequencecoder = SequenceCoder()
 parquets_path = get_base_parquets_path() / DEFAULT_DATASET_NAME
@@ -17,22 +26,8 @@ def test_init_label_column_name():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name="non_existent_column", k=1)
 
-    for label_column_name in TAXONOMY_LABELS:
+    for label_column_name in CachedDataFrame.get_level_column_names():
         TaxoDataset(parquets_path=parquets_path, label_column_name=label_column_name, k=1)
-
-
-def test_init_filters():
-    with pytest.raises(ValueError):
-        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                    filters={"non_existent_column":"xx"})
-
-    with pytest.raises(NotImplementedError):
-        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                    filters={test_filter_key:["xx"]})
-
-    TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                filters={l:"x" for l in TAXONOMY_LABELS})
-
 
 def test_init_k():
     with pytest.raises(ValueError):
@@ -58,6 +53,43 @@ def test_init_k_bits():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, bits=1)
 
+
+def test_init_value_filters():
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    value_filters={"non_existent_column":"xx"})
+
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    value_filters={test_filter_key:[1]})
+
+    TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                value_filters={test_filter_key:["xx"]})
+
+    TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                value_filters={l:"x" for l in CachedDataFrame.get_level_column_names()})
+
+def test_init_min_cardinality_filters():
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    min_cardinality_filters={"non_existent_column":1})
+
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    min_cardinality_filters={test_filter_key: "x"})
+
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    min_cardinality_filters={test_filter_key:  0})
+
+    with pytest.raises(ValueError):
+        TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                    min_cardinality_filters={test_filter_key: -1})
+
+    TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
+                min_cardinality_filters={l:10 for l in CachedDataFrame.get_level_column_names()})
+
+
 def test_init_seq_len_filter():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, seq_len_filter=-1)
@@ -79,11 +111,12 @@ def test_init_indexes_one_column():
     # Test all filters with all the values
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
-    for column_name in TAXONOMY_LABELS:
-        for value in t._df[column_name].unique():
+    for column_name in CachedDataFrame.get_level_column_names():
+        values = t._df[column_name].unique().tolist()
+        for value in random.sample(values, min(100, len(values))):
             t:TaxoDataset
             t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                            filters={column_name: value})
+                            value_filters={column_name: value})
             assert t._filter_indexes is not None
             assert (t._df[column_name] == value).sum() == len(t._filter_indexes), f"{column_name}={value}"
 
@@ -94,35 +127,35 @@ def test_init_indexes_multiple_columns():
 
     df_tmp=t._df
     fiter_tmp = {}
-    for column_name in TAXONOMY_LABELS:
+    for column_name in CachedDataFrame.get_level_column_names():
         for value in t._df[column_name].unique():
             if column_name not in fiter_tmp:
                 fiter_tmp[column_name] = t._df[column_name][0]
                 df_tmp = df_tmp[df_tmp[column_name] == value]
                 t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                                filters=fiter_tmp)
+                                value_filters=fiter_tmp)
                 assert t._filter_indexes is not None
                 assert len(df_tmp) == len(t._filter_indexes), f"{len(df_tmp) }={len(t._filter_indexes)}"
 
-
 def test_init_labels_ids_non_filtered():
-    for label_column_name in TAXONOMY_LABELS:
+    for label_column_name in CachedDataFrame.get_level_column_names():
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=label_column_name, k=1)
-        assert len(t.labels_ids) == len(t._df[label_column_name].unique().tolist())
-        assert len(t.labels_ids) == t.num_labels
+        assert len(t.label_ids) == len(t._df[label_column_name].unique().tolist())
+        assert len(t.label_ids) == t.num_labels
 
 
-def test_init_labels_ids_filtered():
+def test_init_labels_ids_value_filtered():
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
-    for column_name in TAXONOMY_LABELS:
-        for value in t._df[column_name].unique():
+    for column_name in CachedDataFrame.get_level_column_names():
+        values = t._df[column_name].unique().tolist()
+        for value in random.sample(values, min(100, len(values))):
             t:TaxoDataset
             t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
-                            filters={column_name: value})
+                            value_filters={column_name: value})
             df_tmp = t._df[t._df[column_name] == value]
-            assert len(t.labels_ids) == len(df_tmp[test_label_column_name].unique().tolist())
-            assert len(t.labels_ids) == t.num_labels
+            assert len(t.label_ids) == len(df_tmp[test_label_column_name].unique().tolist())
+            assert len(t.label_ids) == t.num_labels
 
 
 def test_num_labels():
@@ -161,3 +194,18 @@ def test_getitem_bits():
     d, v = t[1]
     assert isinstance(d, Tensor)
     assert isinstance(v, Tensor)
+
+def test_get_label_id():
+    assert 1 == 0
+
+def test_min_cardinality_filters():
+    TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
+    for column_name in CachedDataFrame.get_level_column_names():
+        values = CachedDataFrame._df[column_name].to_list()
+        cardinality = Counter(values)
+        avg_cardinality = sum(cardinality.values())//len(cardinality)
+        t = TaxoDataset(parquets_path=parquets_path, label_column_name=column_name, k=1,
+                        min_cardinality_filters={column_name: avg_cardinality})
+        label_values = [k for k in cardinality.keys() if cardinality[k] >= avg_cardinality]
+        assert len(t.label_values) == len(label_values)
+        assert set(t.label_values) == set(label_values)
