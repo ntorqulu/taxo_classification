@@ -24,7 +24,7 @@ class HierarchicalTrainer:
                 criterion: nn.Module,
                 optimizer: torch.optim.Optimizer,
                 device: torch.device,
-                scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+                scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
                 log_dir: Optional[str] = None,
                 checkpoint_dir: Optional[str] = None,
                 class_names_per_level: Optional[Dict[str, List[str]]] = None):
@@ -120,7 +120,7 @@ class HierarchicalTrainer:
                         batch_accuracies[level] = 100. * level_correct[level] / level_total[level]
                 
                 acc_str = ", ".join([f"{level}: {acc:.2f}%" for level, acc in batch_accuracies.items()])
-                info(f'Train Epoch: {epoch} [{batch_idx * len(features)}/{len(train_loader.dataset)}] '
+                info(f'Train Epoch: {epoch} [{batch_idx * len(features)}/N] '
                      f'Loss: {loss.item():.6f}, Acc: {acc_str}')
                 
         # Compute averages
@@ -360,7 +360,7 @@ class HierarchicalTrainer:
         
         return epoch
     
-    def predict(self, data_loader: DataLoader) -> Dict[str, List]:
+    def predict(self, data_loader: DataLoader) -> Dict[str, Any]:
         """
         Make predictions on a dataset.
         

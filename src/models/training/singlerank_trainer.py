@@ -16,7 +16,7 @@ class Trainer:
                 criterion: nn.Module,
                 optimizer: torch.optim.Optimizer,
                 device: torch.device,
-                scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+                scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
                 log_dir: Optional[str] = None,
                 checkpoint_dir: Optional[str] = None,
                 class_names: Optional[List[str]] = None,
