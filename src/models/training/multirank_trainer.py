@@ -458,3 +458,7 @@ class HierarchicalTrainer:
             'predictions': predictions,
             'probabilities': probabilities
         } 
+
+    def get_label_stats(self) -> dict[str, dict[str, Tuple[int, float]]]:
+        # Implementation of get_label_stats method
+        pass 
