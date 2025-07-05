@@ -15,7 +15,7 @@ from dataset.cached_dataframe import CachedDataFrame
 from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
 from dataset.taxo_dataloaders import TaxoDataLoaders
 from models.training.singlerank_trainer import Trainer
-from constants.taxonomy_labels import get_class_names, wrong_class_values
+
 from models.utils.model_factory import create_model
 
 
@@ -239,21 +239,10 @@ def run_experiment(hparams: dict) -> dict:
         
     checkpoint_dir = os.path.join("checkpoints", run_name)
 
-    class_names = get_class_names(hparams["label_column_name"])
+    # Get class names dynamically from the dataset instead of hardcoded ones
+    class_names = taxo_data_loaders.class_names
     info(f"Using {len(class_names)} labels for {hparams['label_column_name']} classification.")
-
-    if class_names and taxo_data_loaders.num_labels != len(class_names):
-        info(
-            f"Warning: Number of class names ({len(class_names)}) doesn't match the number of labels in the dataset ({taxo_data_loaders.num_labels})."
-        )
-        # Adjust class_names to match the number of labels
-        if taxo_data_loaders.num_labels > len(class_names):
-            # Extend with generic labels
-            class_names.extend([f"Class_{i}" for i in range(len(class_names), taxo_data_loaders.num_labels)])
-        else:
-            # Truncate
-            class_names = class_names[: taxo_data_loaders.num_labels]
-        info(f"Adjusted class names to match dataset: {len(class_names)} labels.")
+    info(f"Class names: {', '.join(class_names)}")
 
     trainer = Trainer(
         model=model,
@@ -303,20 +292,7 @@ def main():
     parser.add_argument(
         "--config", type=str, default="hyperparams/kmer_hparams.json", help="Path to hyperparameters JSON file"
     )
-    parser.add_argument(
-        "--model_type",
-        type=str,
-        choices=["basic", "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2", "nanni_att", "nanni_att_kmer", "bert"],
-        help="Model type to train",
-    )
-    parser.add_argument("--fast", action="store_true", help="Enable fast evaluation mode")
-    parser.add_argument("--eval_freq", type=int, default=1, help="Frequency of detailed evaluation")
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default=DEFAULT_DATASET_NAME,
-        help="Directory containing dataset files. Defaults to filtered_ranks",
-    )
+    
     args = parser.parse_args()
 
     # Load hyperparameters
@@ -324,25 +300,9 @@ def main():
         info(f"Using configuration file {args.config}")
         hparams = json.load(f)
 
-    # Override with command line arguments if provided
-    if args.model_type:
-        hparams['model_type'] = args.model_type
-        info(f"Model type: {args.model_type}")
-
-    if args.fast:
-        hparams["fast_mode"] = True
-        info("Fast evaluation mode enabled")
-
-    if args.eval_freq != 1:
-        hparams["eval_frequency"] = args.eval_freq
-        info(f"Detailed evaluation will run every {args.eval_freq} epochs")
-
     # Set default dataset path if not provided
     if hparams["parquets_path"] == "":
         hparams["parquets_path"] = get_base_parquets_path()
-
-    if args.dataset_name:
-        hparams["dataset_name"] = args.dataset_name
 
     # Track timing
     t0 = time.time()

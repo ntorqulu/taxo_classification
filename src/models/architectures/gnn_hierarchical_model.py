@@ -163,6 +163,8 @@ class GNNHierarchicalModel(BaseModel):
                 hidden_sizes: List[int] = [256, 128],
                 gnn_layers: int = 2,
                 use_attention: bool = True,
+                num_classes_per_level: Optional[Dict[str, int]] = None,
+                target_levels: Optional[List[str]] = None,
                 dropout: float = 0.3,
                 name: str = "GNNHierarchicalModel"):
         """
@@ -173,6 +175,8 @@ class GNNHierarchicalModel(BaseModel):
             hidden_sizes: List of hidden layer sizes
             gnn_layers: Number of GNN layers
             use_attention: Whether to use attention mechanism
+            num_classes_per_level: Dict mapping taxonomic level to number of classes
+            target_levels: List of taxonomic levels to train on
             dropout: Dropout probability
             name: Model name
         """
@@ -182,6 +186,12 @@ class GNNHierarchicalModel(BaseModel):
         self.gnn_layers = gnn_layers
         self.use_attention = use_attention
         self.dropout = dropout
+        
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
         
         # Build feature extractor
         self.feature_extractor = nn.ModuleList()
@@ -203,10 +213,17 @@ class GNNHierarchicalModel(BaseModel):
         
         # Build output heads for each taxonomic level
         self.output_heads = nn.ModuleDict()
-        for level in TAXONOMY_LEVELS:
-            if level in TAXONOMY_LABELS:
+        for level in self.target_levels:
+            # Use provided num_classes_per_level or fall back to hardcoded values
+            if num_classes_per_level and level in num_classes_per_level:
+                num_classes = num_classes_per_level[level]
+            elif level in TAXONOMY_LABELS:
                 num_classes = len(TAXONOMY_LABELS[level])
-                self.output_heads[level] = nn.Linear(gnn_input_size, num_classes)
+            else:
+                # Skip levels that don't have class information
+                continue
+            
+            self.output_heads[level] = nn.Linear(gnn_input_size, num_classes)
         
         # Create hierarchical adjacency matrix
         self.register_buffer('adjacency_matrix', self._create_hierarchical_adjacency())
@@ -216,12 +233,12 @@ class GNNHierarchicalModel(BaseModel):
         
     def _create_hierarchical_adjacency(self) -> torch.Tensor:
         """
-        Create adjacency matrix representing hierarchical relationships.
+        Create adjacency matrix for hierarchical taxonomy graph.
         
         Returns:
             Adjacency matrix [num_levels, num_levels]
         """
-        num_levels = len(TAXONOMY_LEVELS)
+        num_levels = len(self.target_levels)
         adj = torch.zeros(num_levels, num_levels)
         
         # Define hierarchical relationships
@@ -229,15 +246,18 @@ class GNNHierarchicalModel(BaseModel):
             'kingdom_name': ['phylum_name'],
             'phylum_name': ['class_name'],
             'class_name': ['order_name'],
-            'order_name': []
+            'order_name': ['family_name'],
+            'family_name': ['genus_name'],
+            'genus_name': ['species_name'],
+            'species_name': []
         }
         
         # Build adjacency matrix
-        for i, level in enumerate(TAXONOMY_LEVELS):
+        for i, level in enumerate(self.target_levels):
             if level in hierarchy:
                 for child in hierarchy[level]:
-                    if child in TAXONOMY_LEVELS:
-                        j = TAXONOMY_LEVELS.index(child)
+                    if child in self.target_levels:
+                        j = self.target_levels.index(child)
                         adj[i, j] = 1.0  # Parent to child
                         adj[j, i] = 1.0  # Child to parent (bidirectional)
         
@@ -257,7 +277,7 @@ class GNNHierarchicalModel(BaseModel):
             Dictionary mapping taxonomic levels to their logits
         """
         batch_size = x.size(0)
-        num_levels = len(TAXONOMY_LEVELS)
+        num_levels = len(self.target_levels)
         
         # Feature extraction
         features = x
@@ -290,7 +310,7 @@ class GNNHierarchicalModel(BaseModel):
         
         # Generate predictions for each level
         outputs = {}
-        for i, level in enumerate(TAXONOMY_LEVELS):
+        for i, level in enumerate(self.target_levels):
             if level in self.output_heads:
                 level_features = node_features[:, i, :]  # [batch_size, hidden_size]
                 outputs[level] = self.output_heads[level](level_features)
@@ -346,6 +366,7 @@ class GNHLoss(nn.Module):
     
     def __init__(self, 
                 level_weights: Optional[Dict[str, float]] = None,
+                target_levels: Optional[List[str]] = None,
                 graph_weight: float = 0.1,
                 consistency_weight: float = 0.05):
         """
@@ -353,14 +374,21 @@ class GNHLoss(nn.Module):
         
         Args:
             level_weights: Dictionary mapping taxonomic levels to their loss weights
+            target_levels: List of taxonomic levels to include in loss calculation
             graph_weight: Weight for graph structure regularization
             consistency_weight: Weight for hierarchical consistency
         """
         super().__init__()
         
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        
         # Default equal weights if not provided
         if level_weights is None:
-            level_weights = {level: 1.0 for level in TAXONOMY_LEVELS}
+            level_weights = {level: 1.0 for level in self.target_levels}
         self.level_weights = level_weights
         self.graph_weight = graph_weight
         self.consistency_weight = consistency_weight
@@ -368,8 +396,8 @@ class GNHLoss(nn.Module):
         # Classification loss
         self.criterion = nn.CrossEntropyLoss()
         
-        # Hierarchical order
-        self.hierarchy_order = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        # Hierarchical order (use target_levels as hierarchy order)
+        self.hierarchy_order = self.target_levels
     
     def _graph_structure_loss(self, predictions: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
@@ -403,7 +431,7 @@ class GNHLoss(nn.Module):
         """
         consistency_loss = torch.tensor(0.0, device=next(iter(predictions.values())).device)
         
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in predictions:
                 probs = F.softmax(predictions[level], dim=1)
                 max_probs = torch.max(probs, dim=1)[0]
@@ -426,18 +454,18 @@ class GNHLoss(nn.Module):
         """
         # Classification loss
         classification_loss = 0.0
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in predictions and level in targets:
                 level_loss = self.criterion(predictions[level], targets[level])
                 classification_loss += self.level_weights[level] * level_loss
         
-        # Graph structure loss
+        # Graph structure regularization
         graph_loss = self._graph_structure_loss(predictions)
         
-        # Hierarchical consistency loss
+        # Hierarchical consistency
         consistency_loss = self._hierarchical_consistency_loss(predictions)
         
-        # Combine all losses
+        # Combined loss
         total_loss = (classification_loss + 
                      self.graph_weight * graph_loss + 
                      self.consistency_weight * consistency_loss)
@@ -452,39 +480,44 @@ class GNNAccuracy:
     
     @staticmethod
     def compute_accuracy(predictions: Dict[str, torch.Tensor], 
-                        targets: Dict[str, torch.Tensor]) -> Dict[str, float]:
+                        targets: Dict[str, torch.Tensor],
+                        target_levels: Optional[List[str]] = None) -> Dict[str, float]:
         """
         Compute accuracy for each taxonomic level.
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to compute accuracy for
             
         Returns:
             Dictionary mapping taxonomic levels to their accuracies
         """
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+            
         accuracies = {}
         
-        for level in TAXONOMY_LEVELS:
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 correct = pred.eq(targets[level]).sum().item()
                 total = targets[level].size(0)
                 accuracies[level] = correct / total if total > 0 else 0.0
-            else:
-                accuracies[level] = 0.0
         
         return accuracies
     
     @staticmethod
     def compute_hierarchical_accuracy(predictions: Dict[str, torch.Tensor], 
-                                    targets: Dict[str, torch.Tensor]) -> float:
+                                    targets: Dict[str, torch.Tensor],
+                                    target_levels: Optional[List[str]] = None) -> float:
         """
         Compute hierarchical accuracy (all levels correct).
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to include in hierarchical accuracy
             
         Returns:
             Hierarchical accuracy (fraction of samples where all levels are correct)
@@ -492,10 +525,17 @@ class GNNAccuracy:
         if not predictions or not targets:
             return 0.0
         
-        # Get predictions and targets for all levels
-        all_correct = torch.ones(targets[list(targets.keys())[0]].size(0), dtype=torch.bool, device=targets[list(targets.keys())[0]].device)
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
         
-        for level in TAXONOMY_LEVELS:
+        # Get the first level to determine batch size
+        first_level = list(predictions.keys())[0]
+        batch_size = predictions[first_level].size(0)
+        
+        # Check if all levels are correct for each sample
+        all_correct = torch.ones(batch_size, dtype=torch.bool, device=predictions[first_level].device)
+        
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 level_correct = pred.eq(targets[level])

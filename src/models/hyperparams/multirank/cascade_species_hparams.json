@@ -1,0 +1,42 @@
+{
+    "model_type": "cascade_hierarchical",
+    "label_column_name": "species_name",
+    "dataset_name": "all_ranks",
+    "parquets_path": "data/parquets",
+    "k": 3,
+    "batch_size": 32,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-5,
+    "dropout": 0.3,
+    "patience": 10,
+    "seed": 123,
+    "experiment_id": "cascade_species_20241201",
+    "shared_hidden_sizes": [512, 256],
+    "level_specific_sizes": {
+        "kingdom_name": [128, 64],
+        "phylum_name": [128, 64],
+        "class_name": [128, 64],
+        "order_name": [128, 64],
+        "family_name": [128, 64],
+        "genus_name": [128, 64],
+        "species_name": [128, 64]
+    },
+    "level_weights": {
+        "kingdom_name": 1.0,
+        "phylum_name": 1.0,
+        "class_name": 1.0,
+        "order_name": 1.0,
+        "family_name": 1.0,
+        "genus_name": 1.0,
+        "species_name": 1.0
+    },
+    "cascade_weight": 0.1,
+    "confidence_weight": 0.05,
+    "use_confidence_weighting": true,
+    "use_scheduler": true,
+    "scheduler_factor": 0.5,
+    "scheduler_patience": 3,
+    "eval_frequency": 1,
+    "fast_mode": false
+} 

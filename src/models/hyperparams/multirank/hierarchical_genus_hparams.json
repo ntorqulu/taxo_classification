@@ -7,12 +7,12 @@
   "batch_size": 30,
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
-  "label_column_name": "order_name",
+  "label_column_name": "genus_name",
   "k": 4,
   "bits": null,
   "hidden_size": null,
   
-  "model_type": "cascade_hierarchical",
+  "model_type": "hierarchical",
   "balancing_method": "none",
   "optimizer": "adam",
   "use_scheduler": true,
@@ -26,19 +26,25 @@
     "kingdom_name": [128, 64],
     "phylum_name": [128, 64],
     "class_name": [128, 64],
-    "order_name": [128, 64]
+    "order_name": [128, 64],
+    "family_name": [128, 64],
+    "genus_name": [128, 64],
+    "species_name": [128, 64]
   },
   "dropout": 0.3,
-  "use_confidence_weighting": true,
   
-  "cascade_weight": 0.1,
-  "confidence_weight": 0.05,
   "level_weights": {
     "kingdom_name": 1.0,
-    "phylum_name": 1.0,
-    "class_name": 1.0,
-    "order_name": 1.0
+    "phylum_name": 1.2,
+    "class_name": 1.4,
+    "order_name": 1.6,
+    "family_name": 1.8,
+    "genus_name": 2.0,
+    "species_name": 2.2
   },
+  "loss_type": "cross_entropy",
+  "focal_alpha": 1.0,
+  "focal_gamma": 2.0,
 
   "fast_mode": true,
   "eval_frequency": 5,

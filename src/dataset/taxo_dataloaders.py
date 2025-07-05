@@ -194,6 +194,18 @@ class TaxoDataLoaders:
     def max_sequence_len(self) -> int:
         return self.taxo_dataset.max_sequence_len
 
+    @property
+    def class_names(self) -> list[str]:
+        """
+        Get the class names dynamically from the dataset.
+        
+        Returns
+        -------
+        list[str]
+            List of class names in the same order as the label IDs
+        """
+        return self.taxo_dataset.label_values
+
     def compare_label_values(self) -> dict[str, dict[str, list[str]] | None]:
         # Get the label values from the source dataset
         source_values = set(self.taxo_dataset.label_values)

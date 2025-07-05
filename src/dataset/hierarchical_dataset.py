@@ -4,11 +4,10 @@ import pandas as pd
 from typing import Final, Dict, Any, Optional
 from torch.utils.data import Dataset
 
-from src.dataset.cached_dataframe import CachedDataFrame
-from src.dataset.parquet_builder import ParquetBuilder
-from src.dataset.utils import info
-from src.feature_extraction.main import SequenceCoder
-from src.constants.taxonomy_labels import TAXONOMY_LABELS, TAXONOMY_LEVELS
+from dataset.cached_dataframe import CachedDataFrame
+from dataset.parquet_builder import ParquetBuilder
+from dataset.utils import info
+from feature_extraction.main import SequenceCoder
 
 
 class HierarchicalDataset(Dataset):
@@ -24,9 +23,9 @@ class HierarchicalDataset(Dataset):
 
     def __init__(self,
                  parquets_path: Path,
-                 filters: Dict[str, str | list[str]] = None,
-                 k: int = None,
-                 bits: int = None,
+                 filters: Dict[str, str | list[str]] | None = None,
+                 k: int | None = None,
+                 bits: int | None = None,
                  seq_len_filter: int | None = None,
                  include_sequence: bool = False):
         """
@@ -44,8 +43,6 @@ class HierarchicalDataset(Dataset):
 
         if not filters:
             filters = {}
-        elif any(r not in TAXONOMY_LABELS for r in filters.keys()):
-            raise ValueError(f"Unrecognized filter keys: {filters.keys()}")
         if k is None and bits is None:
             raise ValueError(f"Must specify k or bits")
         if k is not None and k not in ParquetBuilder.KMERS_SIZES:
@@ -60,10 +57,10 @@ class HierarchicalDataset(Dataset):
             raise ValueError(f"seq_len_filter must be positive: {seq_len_filter}")
 
         self.parquet_path: Path = parquets_path
-        self.filters: Dict[str, str] = filters
+        self.filters: Dict[str, str | list[str]] = filters or {}
         self.k: Optional[int] = k
         self.bits: Optional[int] = bits
-        self.seq_len_filter: int = seq_len_filter
+        self.seq_len_filter: Optional[int] = seq_len_filter
         self.include_sequence: bool = include_sequence
 
         # DataFrame with the data, but without the encodings
@@ -120,10 +117,14 @@ class HierarchicalDataset(Dataset):
         """
         labels_ids = {}
         
-        for level in TAXONOMY_LEVELS:
-            if level not in TAXONOMY_LABELS:
-                continue
-                
+        # Define all possible taxonomic levels in order
+        all_possible_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name', 'family_name', 'genus_name', 'species_name']
+        
+        # Check which levels are actually available in the dataset
+        available_levels = [level for level in all_possible_levels if level in self._df.columns]
+        info(f"Available taxonomic levels in dataset: {available_levels}")
+        
+        for level in available_levels:
             # Get the label values depending on whether filters are applied or not
             if self._filter_indexes is None:
                 label_values = self._df[level]
@@ -209,11 +210,10 @@ class HierarchicalDataset(Dataset):
         
         # Get targets for all levels
         targets = {}
-        for level in TAXONOMY_LEVELS:
-            if level in self._labels_ids:
-                target_value = self._get_column_value(actual_idx, level)
-                target_id = self._labels_ids[level][target_value]
-                targets[level] = torch.tensor(target_id, dtype=torch.long)
+        for level in self._labels_ids.keys():
+            target_value = self._get_column_value(actual_idx, level)
+            target_id = self._labels_ids[level][target_value]
+            targets[level] = torch.tensor(target_id, dtype=torch.long)
         
         result = {
             'features': features,

@@ -17,7 +17,9 @@ class HierarchicalModel(BaseModel):
     def __init__(self,
                 input_size: int,
                 shared_hidden_sizes: List[int] = [512, 256],
-                level_specific_sizes: Dict[str, List[int]] = None,
+                level_specific_sizes: Optional[Dict[str, List[int]]] = None,
+                num_classes_per_level: Optional[Dict[str, int]] = None,
+                target_levels: Optional[List[str]] = None,
                 dropout: float = 0.3,
                 name: str = "HierarchicalModel"):
         """
@@ -27,6 +29,8 @@ class HierarchicalModel(BaseModel):
             input_size: Size of input features
             shared_hidden_sizes: List of hidden layer sizes for shared feature extractor
             level_specific_sizes: Dict mapping taxonomic level to specific hidden layer sizes
+            num_classes_per_level: Dict mapping taxonomic level to number of classes
+            target_levels: List of taxonomic levels to train on (if None, uses all available levels from num_classes_per_level)
             dropout: Dropout probability
             name: Model name
         """
@@ -35,13 +39,25 @@ class HierarchicalModel(BaseModel):
         self.shared_hidden_sizes = shared_hidden_sizes
         self.dropout = dropout
         
+        # Use target_levels if provided, otherwise use all available levels from num_classes_per_level
+        if target_levels is not None:
+            self.target_levels = target_levels
+        elif num_classes_per_level is not None:
+            self.target_levels = list(num_classes_per_level.keys())
+        else:
+            # Fallback to basic levels if nothing is provided
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        
         # Default level-specific sizes if not provided
         if level_specific_sizes is None:
             level_specific_sizes = {
                 'kingdom_name': [128, 64],
                 'phylum_name': [128, 64], 
                 'class_name': [128, 64],
-                'order_name': [128, 64]
+                'order_name': [128, 64],
+                'family_name': [128, 64],
+                'genus_name': [128, 64],
+                'species_name': [128, 64]
             }
         self.level_specific_sizes = level_specific_sizes
         
@@ -55,21 +71,28 @@ class HierarchicalModel(BaseModel):
         
         # Build level-specific output heads
         self.level_heads = nn.ModuleDict()
-        for level in TAXONOMY_LEVELS:
-            if level in TAXONOMY_LABELS:
+        for level in self.target_levels:
+            # Use provided num_classes_per_level or fall back to hardcoded values
+            if num_classes_per_level and level in num_classes_per_level:
+                num_classes = num_classes_per_level[level]
+            elif level in TAXONOMY_LABELS:
                 num_classes = len(TAXONOMY_LABELS[level])
-                head_layers = nn.ModuleList()
-                
-                # Level-specific hidden layers
-                prev_size = shared_hidden_sizes[-1]
-                for hidden_size in level_specific_sizes.get(level, [128, 64]):
-                    head_layers.append(nn.Linear(prev_size, hidden_size))
-                    prev_size = hidden_size
-                
-                # Output layer
-                head_layers.append(nn.Linear(prev_size, num_classes))
-                
-                self.level_heads[level] = head_layers
+            else:
+                # Skip levels that don't have class information
+                continue
+            
+            head_layers = nn.ModuleList()
+            
+            # Level-specific hidden layers
+            prev_size = shared_hidden_sizes[-1]
+            for hidden_size in level_specific_sizes.get(level, [128, 64]):
+                head_layers.append(nn.Linear(prev_size, hidden_size))
+                prev_size = hidden_size
+            
+            # Output layer
+            head_layers.append(nn.Linear(prev_size, num_classes))
+            
+            self.level_heads[level] = head_layers
         
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
@@ -126,6 +149,8 @@ class HierarchicalModel(BaseModel):
             input_size=config['input_size'],
             shared_hidden_sizes=config['shared_hidden_sizes'],
             level_specific_sizes=config.get('level_specific_sizes'),
+            num_classes_per_level=config.get('num_classes_per_level'),
+            target_levels=config.get('target_levels'),
             dropout=config.get('dropout', 0.3),
             name=config.get('name', 'HierarchicalModel')
         )
@@ -143,6 +168,7 @@ class HierarchicalLoss(nn.Module):
     
     def __init__(self, 
                 level_weights: Optional[Dict[str, float]] = None,
+                target_levels: Optional[List[str]] = None,
                 loss_type: str = 'cross_entropy',
                 focal_alpha: float = 1.0,
                 focal_gamma: float = 2.0):
@@ -151,15 +177,22 @@ class HierarchicalLoss(nn.Module):
         
         Args:
             level_weights: Dictionary mapping taxonomic levels to their loss weights
+            target_levels: List of taxonomic levels to include in loss calculation
             loss_type: Type of loss function ('cross_entropy' or 'focal')
             focal_alpha: Alpha parameter for focal loss
             focal_gamma: Gamma parameter for focal loss
         """
         super().__init__()
         
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        
         # Default equal weights if not provided
         if level_weights is None:
-            level_weights = {level: 1.0 for level in TAXONOMY_LEVELS}
+            level_weights = {level: 1.0 for level in self.target_levels}
         self.level_weights = level_weights
         
         self.loss_type = loss_type
@@ -204,7 +237,7 @@ class HierarchicalLoss(nn.Module):
         """
         total_loss = 0.0
         
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in predictions and level in targets:
                 if self.loss_type == 'cross_entropy':
                     level_loss = self.criterion(predictions[level], targets[level])
@@ -225,20 +258,25 @@ class HierarchicalAccuracy:
     
     @staticmethod
     def compute_accuracy(predictions: Dict[str, torch.Tensor], 
-                        targets: Dict[str, torch.Tensor]) -> Dict[str, float]:
+                        targets: Dict[str, torch.Tensor],
+                        target_levels: Optional[List[str]] = None) -> Dict[str, float]:
         """
         Compute accuracy for each taxonomic level.
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to compute accuracy for
             
         Returns:
             Dictionary mapping taxonomic levels to their accuracies
         """
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+            
         accuracies = {}
         
-        for level in TAXONOMY_LEVELS:
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 correct = pred.eq(targets[level]).sum().item()
@@ -249,19 +287,24 @@ class HierarchicalAccuracy:
     
     @staticmethod
     def compute_hierarchical_accuracy(predictions: Dict[str, torch.Tensor], 
-                                    targets: Dict[str, torch.Tensor]) -> float:
+                                    targets: Dict[str, torch.Tensor],
+                                    target_levels: Optional[List[str]] = None) -> float:
         """
         Compute hierarchical accuracy (all levels correct).
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to include in hierarchical accuracy
             
         Returns:
             Hierarchical accuracy (fraction of samples where all levels are correct)
         """
         if not predictions or not targets:
             return 0.0
+        
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
         
         # Get the first level to determine batch size
         first_level = list(predictions.keys())[0]
@@ -270,7 +313,7 @@ class HierarchicalAccuracy:
         # Check if all levels are correct for each sample
         all_correct = torch.ones(batch_size, dtype=torch.bool, device=predictions[first_level].device)
         
-        for level in TAXONOMY_LEVELS:
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 level_correct = pred.eq(targets[level])

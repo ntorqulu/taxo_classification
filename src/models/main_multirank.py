@@ -12,8 +12,6 @@ from dataset.utils import info, get_base_parquets_path, DEFAULT_DATASET_NAME
 def main():
     parser = argparse.ArgumentParser(description='Multi-Rank Taxonomy Classification')
     parser.add_argument('--config', type=str, required=True, help='Path to configuration JSON file')
-    parser.add_argument('--data_path', type=str, help='Path to the parquet dataset directory (e.g., data/parquets/filtered_ranks). If not provided, will use parquets_path from config or default path.')
-    parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
     args = parser.parse_args()
 
     # Load configuration
@@ -21,18 +19,17 @@ def main():
         config = json.load(f)
     info(f"Loaded configuration from {args.config}")
 
-    # Handle data path similar to single-rank script
-    if args.data_path:
-        # Use command line argument if provided
-        data_path = Path(args.data_path)
-    elif config.get('parquets_path'):
+    # Handle data path from config file
+    dataset_name = config.get('dataset_name', DEFAULT_DATASET_NAME)
+    if config.get('parquets_path'):
         # Use path from config file
-        data_path = Path(config['parquets_path']) / args.dataset_name
+        data_path = Path(config['parquets_path']) / dataset_name
     else:
         # Use default path
-        data_path = get_base_parquets_path() / args.dataset_name
+        data_path = get_base_parquets_path() / dataset_name
     
     info(f"Using data path: {data_path}")
+    info(f"Dataset name: {dataset_name}")
 
     # Set random seed
     torch.manual_seed(config.get('seed', 123))
@@ -43,6 +40,36 @@ def main():
         k=config.get('k'),
         bits=config.get('bits')
     )
+    
+    # Log dataset information
+    info(f"Dataset loaded with {len(dataset)} samples")
+    info(f"Number of classes per level: {dataset.num_labels_per_level}")
+    info(f"Labels per level: {dataset.labels_names_per_level}")
+    
+    # Determine target levels based on label_column_name
+    label_column_name = config.get('label_column_name', 'order_name')
+    all_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name', 'family_name', 'genus_name', 'species_name']
+    
+    # Find the index of the target level
+    try:
+        target_level_index = all_levels.index(label_column_name)
+        target_levels = all_levels[:target_level_index + 1]  # Include up to the target level
+        info(f"Training on levels up to {label_column_name}: {target_levels}")
+    except ValueError:
+        # If label_column_name is not in the predefined levels, use all available levels from dataset
+        target_levels = list(dataset.num_labels_per_level.keys())
+        info(f"Training on all available levels from dataset: {target_levels}")
+    
+    # Verify that all target levels are available in the dataset
+    available_levels = list(dataset.num_labels_per_level.keys())
+    missing_levels = [level for level in target_levels if level not in available_levels]
+    if missing_levels:
+        info(f"Warning: Target levels {missing_levels} are not available in the dataset")
+        info(f"Available levels: {available_levels}")
+        # Use only the levels that are available in the dataset
+        target_levels = [level for level in target_levels if level in available_levels]
+        info(f"Adjusted target levels: {target_levels}")
+    
     from torch.utils.data import DataLoader, random_split
     total_size = len(dataset)
     train_size = int(0.7 * total_size)
@@ -71,6 +98,8 @@ def main():
         input_size=input_size,
         shared_hidden_sizes=config.get('shared_hidden_sizes', [512, 256]),
         level_specific_sizes=config.get('level_specific_sizes'),
+        num_classes_per_level=dataset.num_labels_per_level,
+        target_levels=target_levels,
         dropout=config.get('dropout', 0.3),
         use_confidence_weighting=config.get('use_confidence_weighting', True),
         name=model_name
@@ -82,6 +111,7 @@ def main():
         from src.models.architectures.cascade_hierarchical_model import CascadeLoss
         criterion = CascadeLoss(
             level_weights=config.get('level_weights'),
+            target_levels=target_levels,
             cascade_weight=config.get('cascade_weight', 0.1),
             confidence_weight=config.get('confidence_weight', 0.05)
         )
@@ -89,6 +119,7 @@ def main():
         from src.models.architectures.gnn_hierarchical_model import GNHLoss
         criterion = GNHLoss(
             level_weights=config.get('level_weights'),
+            target_levels=target_levels,
             graph_weight=config.get('graph_weight', 0.1),
             consistency_weight=config.get('consistency_weight', 0.05)
         )
@@ -96,6 +127,7 @@ def main():
         from src.models.architectures.hierarchical_model import HierarchicalLoss
         criterion = HierarchicalLoss(
             level_weights=config.get('level_weights'),
+            target_levels=target_levels,
             loss_type=config.get('loss_type', 'cross_entropy')
         )
 
@@ -118,7 +150,7 @@ def main():
 
     # Set up run name and directories (similar to single-rank)
     encoding_suffix = f"k{config['k']}" if config.get('k') else f"bits{config['bits']}"
-    run_name = f"{model.name}_multirank_{encoding_suffix}"
+    run_name = f"{model.name}_multirank_{dataset_name}_{encoding_suffix}"
     log_dir = os.path.join("runs", run_name)
     checkpoint_dir = os.path.join("checkpoints", run_name)
 
@@ -132,7 +164,8 @@ def main():
         scheduler=scheduler,
         log_dir=log_dir,
         checkpoint_dir=checkpoint_dir,
-        class_names_per_level=dataset.labels_names_per_level
+        class_names_per_level=dataset.labels_names_per_level,
+        target_levels=target_levels
     )
 
     # Train
