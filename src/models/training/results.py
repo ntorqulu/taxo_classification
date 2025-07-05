@@ -1,6 +1,44 @@
 import numpy as np
 from typing import List, Dict, Union, Tuple, Any
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
+import json
+from pathlib import Path
+
+
+class TrainingResults:
+    """Class to track and store training results."""
+    
+    def __init__(self):
+        self.epochs = []
+    
+    def add_epoch(self, epoch_data: Dict[str, Any]):
+        """Add epoch results."""
+        self.epochs.append(epoch_data)
+    
+    def get_best_epoch(self, metric: str = 'val_accuracy') -> Dict[str, Any]:
+        """Get the best epoch based on a metric."""
+        if not self.epochs:
+            return {}
+        
+        best_epoch = max(self.epochs, key=lambda x: x.get(metric, 0))
+        return best_epoch
+    
+    def save(self, path: Union[str, Path]):
+        """Save results to JSON file."""
+        path = Path(path)
+        with open(path, 'w') as f:
+            json.dump({
+                'epochs': self.epochs,
+                'best_epoch': self.get_best_epoch()
+            }, f, indent=2)
+    
+    def load(self, path: Union[str, Path]):
+        """Load results from JSON file."""
+        path = Path(path)
+        with open(path, 'r') as f:
+            data = json.load(f)
+            self.epochs = data.get('epochs', [])
+
 
 def compute_accuracy(y_true, y_pred):
     """

@@ -9,7 +9,7 @@
     "weight_decay": 0,
     "label_column_name": "order_name",
     "k": null,
-    "bits": 0,
+    "bits": 4,
     "hidden_size": 100,
     
     "model_type": "nanni_att",
@@ -17,8 +17,6 @@
     "use_scheduler": true,
     "scheduler": "by_step",
     "every_n_epochs": 50,
-
-    "seq_len_filter": 313,
     
     "dropout": 0.5,
     "use_batch_norm": true,

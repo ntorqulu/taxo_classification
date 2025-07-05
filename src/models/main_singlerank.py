@@ -9,13 +9,13 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from constants.taxonomy_labels import get_class_names, wrong_class_values
-from dataset.cached_dataframe import CachedDataFrame
-from dataset.taxo_dataloaders import TaxoDataLoaders
-from dataset.utils import DEFAULT_DATASET_NAME, get_base_parquets_path, info, warn
-from torch.utils.tensorboard import SummaryWriter
 
-from models.training.trainer import Trainer
+from torch.utils.tensorboard import SummaryWriter
+from dataset.cached_dataframe import CachedDataFrame
+from dataset.utils import info, warn, get_base_parquets_path, DEFAULT_DATASET_NAME
+from dataset.taxo_dataloaders import TaxoDataLoaders
+from models.training.singlerank_trainer import Trainer
+from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
 
 
@@ -27,7 +27,6 @@ def init_device(seed: int = 42) -> torch.device:
         torch.cuda.manual_seed(seed)
         d = torch.device("cuda")
     elif torch.backends.mps.is_available():  # For Apple Silicon (M1/M2/M3/M4)
-        torch.backends.mps.enable_prior_normalization = True
         d = torch.device("mps")
         info("Using Apple Metal Performance Shaders (MPS) backend")
     elif torch.xpu.is_available():
@@ -46,7 +45,7 @@ def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
     results = taxo_data_loaders.compare_label_values()
     for ds_name in results.keys():
         ds_results = results[ds_name]
-        if not ds_results['missing'] and not ds_results['unknown']:
+        if ds_results is None or (not ds_results['missing'] and not ds_results['unknown']):
             info(f"Label values in {ds_name} dataset are valid")
             continue
 
@@ -56,16 +55,16 @@ def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
         if ds_results['unknown']:
             warn(f"Unknown label values found in {ds_name} dataset: {ds_results['unknown']}")
 
-    # Log a summary of the label values and stratificacion
+    # Log a summary of the label values and stratification
 
     label_stats = taxo_data_loaders.get_label_stats()
 
     summary = {}
-    summary_total = {'train': (0, 0), 'eval': (0, 0), 'test': (0, 0)}
+    summary_total = {'train': (0, 0.0), 'eval': (0, 0.0), 'test': (0, 0.0)}
     for ds_name in ('train', 'eval', 'test'):
         for name, (count, pct) in label_stats[ds_name].items():
             if name not in summary:
-                summary[name] = {'train': (0, 0), 'eval': (0, 0), 'test': (0, 0)}
+                summary[name] = {'train': (0, 0.0), 'eval': (0, 0.0), 'test': (0, 0.0)}
             summary[name][ds_name] = (count, pct)
             summary_total[ds_name] = (summary_total[ds_name][0] + count, summary_total[ds_name][1] + pct)
     summary[' '] = summary_total
@@ -77,7 +76,7 @@ def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
             line += f"{summary[name][ds][0]:>7} {100 * summary[name][ds][1]:>6.2f}% "
         info(line)
 
-    # Log the dataset length and sequence lenghts
+    # Log the dataset length and sequence lengths
 
     info(f"Full dataset - {CachedDataFrame.get_length()}")
     info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
@@ -117,7 +116,8 @@ def run_experiment(hparams: dict) -> dict:
         batch_size=hparams["batch_size"],
         max_rows=hparams["max_rows"],
         seq_len_filter=hparams.get("seq_len_filter", None),
-        min_cardinality_filters=min_cardinality_filters
+        min_cardinality_filters=min_cardinality_filters or {},
+        use_bert_collate=(hparams.get("model_type", "basic") == "bert")
     )
 
     log_label_stats(taxo_data_loaders)
@@ -155,6 +155,15 @@ def run_experiment(hparams: dict) -> dict:
 
     elif hparams.get("model_type") == "nanni_att":
         model_params["sequence_length"] = hparams.get("sequence_length", 313)
+
+    elif hparams.get("model_type") == "bert":
+        model_params["vocab_size"] = hparams.get("vocab_size", 5)
+        model_params["max_length"] = hparams.get("max_length", 512)
+        model_params["hidden_size"] = hparams.get("hidden_size", 256)
+        model_params["num_layers"] = hparams.get("num_layers", 6)
+        model_params["num_heads"] = hparams.get("num_heads", 8)
+        model_params["dropout"] = hparams.get("dropout", 0.3)
+        model_params["classifier_hidden_size"] = hparams.get("classifier_hidden_size", 256)
 
     # Add experiment identifier to model name
     exp_id = hparams.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
@@ -297,7 +306,7 @@ def main():
     parser.add_argument(
         "--model_type",
         type=str,
-        choices=["basic", "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2", "nanni_att", "nanni_att_kmer"],
+        choices=["basic", "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2", "nanni_att", "nanni_att_kmer", "bert"],
         help="Model type to train",
     )
     parser.add_argument("--fast", action="store_true", help="Enable fast evaluation mode")
