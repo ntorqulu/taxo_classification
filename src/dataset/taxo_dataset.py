@@ -7,10 +7,8 @@ from torch.utils.data import Dataset
 
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.parquet_builder import ParquetBuilder
-from dataset.utils import info
 from feature_extraction.main import SequenceCoder
-from constants.taxonomy_labels import TAXONOMY_LABELS
-
+from dataset.utils import info
 
 class TaxoDataset(Dataset):
     # Discared columns seqID,taxID,scientific_name
@@ -22,9 +20,10 @@ class TaxoDataset(Dataset):
     def __init__(self,
                  parquets_path: Path,
                  label_column_name: str,
-                 filters: dict[str, str | list[str]] = None,
                  k: int = None,
                  bits: int = None,
+                 value_filters: dict[str, str | list[str]] = None,
+                 min_cardinality_filters: dict[str, int] = None,
                  seq_len_filter: int | None = None,
                  ):
         """
@@ -51,28 +50,54 @@ class TaxoDataset(Dataset):
         """
         super().__init__()
 
-        if not filters:
-            filters = {}
-        elif any(r not in TAXONOMY_LABELS for r in filters.keys()):
-            raise ValueError(f"Unrecognized filter keys: {filters.keys()}")
-        if label_column_name not in TAXONOMY_LABELS:
-            raise ValueError(f"Unrecognized label column name: {label_column_name}")
+        # Set default values
+
+        if not value_filters:
+            value_filters = {}
+
+        if not min_cardinality_filters:
+            min_cardinality_filters = {}
+
+        # Validate k parameter
+
         if k is None and bits is None:
             raise ValueError(f"Must specify k or bits")
+
         if k is not None and k not in ParquetBuilder.KMERS_SIZES:
             raise ValueError(f"Values allowed for k: {ParquetBuilder.KMERS_SIZES}")
+
+        # Validate bits parameter
+
         if bits is not None and bits not in SequenceCoder().bit_mapping and bits != 0:
             raise ValueError(f"Values allowed for bits: 0, {SequenceCoder().bit_mapping.keys()}")
+
         if (k is not None) == (bits is not None):
             raise ValueError(f"You only can specify k and bits, not both: {k=} {bits=}")
-        if any(not isinstance(f, str) for f in filters.values()):
-            raise NotImplementedError(f"Only strings are allowed as filter values")
+
+        # Validate value_filters parameter
+
+        if any(not isinstance(f, str) and not isinstance(f, list) for f in value_filters.values()):
+            raise ValueError(f"Only strings or list of strings are allowed as filter values")
+
+        for v in value_filters.values():
+            if isinstance(v, list) and any(not isinstance(vv, str) for vv in v):
+                raise ValueError(f"Only strings are allowed as filter values in lists")
+
+        # Validate min_cardinality_filters parameter
+
+        if any(not isinstance(f, int) for f in min_cardinality_filters.values()):
+            raise ValueError(f"Only int are allowed as filter values")
+
+        if any(f <= 0 for f in min_cardinality_filters.values()):
+            raise ValueError(f"Only positive values are allowed as filter values")
+
+        # Validate seq_len_filter
+
         if seq_len_filter is not None and seq_len_filter <= 0:
             raise ValueError(f"seq_len_filter must be positive: {seq_len_filter}")
 
+
         self.parquet_path: Path = parquets_path
-        self.filters: dict[str, str] = filters
-        self.label_column_name: str = label_column_name
         self.k: int | None = k
         self.bits: int | None = bits
         self.seq_len_filter: int = seq_len_filter
@@ -85,13 +110,26 @@ class TaxoDataset(Dataset):
                                                                                 k=self.k,
                                                                                 bits=self.bits)
 
+        level_column_names: Final[list[str]] = CachedDataFrame.get_level_column_names()
+        if any(r not in level_column_names for r in value_filters.keys()):
+            raise ValueError(f"Unrecognized filter keys in filters: {value_filters.keys()}")
+        if any(r not in level_column_names for r in min_cardinality_filters.keys()):
+            raise ValueError(f"Unrecognized filter keys in level_column_names: {min_cardinality_filters.keys()}")
+        if label_column_name not in level_column_names:
+            raise ValueError(f"Unrecognized label column name: {label_column_name}")
+
+        self.value_filters: dict[str, str] = value_filters
+        self.min_cardinality_filters: dict[str, int] = min_cardinality_filters
+        self.label_column_name: str = label_column_name
+
         # Indexes of the final rows after applying both the filter and max_len_filter, if specified.
         # It is None if no index is applied, meaning all rows are included.
         self._filter_indexes: list[int] | None = self._init_filter_indexes()
 
         # Dictionary with the mapping between label strings and their assigned IDs.
-        self._labels_ids: dict[str, int] = self._init_labels_ids()
+        self._label_ids_by_name: dict[str, int] = self._init_label_ids()
 
+        info(f"There are {len(self.label_ids)} labels values: {', '.join(self.label_values)}")
 
     def _init_filter_indexes(self) -> list[int] | None:
         """
@@ -102,13 +140,13 @@ class TaxoDataset(Dataset):
         The list of indexes, or None if no filters applyied
         """
 
-        if not self.filters and self.seq_len_filter is None:
+        if not self.value_filters and not self.min_cardinality_filters and not self.seq_len_filter:
             return None
 
         mask = pd.Series(True, index=self._df.index)
 
         # Update the mask applying the filters
-        for columm_name, value in self.filters.items():
+        for columm_name, value in self.value_filters.items():
             if isinstance(value, str):
                 mask &= self._df[columm_name] == value
             elif isinstance(value, list):
@@ -116,15 +154,20 @@ class TaxoDataset(Dataset):
             else:
                 raise NotImplementedError(f"Value types not implemented: {value}")
 
-        # Undate the mask with the maxiumn sequence length fitler
+        # Update the mask with the maxiumn sequence length fitler
         if self.seq_len_filter is not None:
             mask &= self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].str.len() == self.seq_len_filter
+
+        # Update the mask applying the filter_min_cardinalities
+        for column_name, min_cardinality in self.min_cardinality_filters.items():
+            cardinalities = self._df[column_name].value_counts()
+            mask &= self._df[column_name].map(cardinalities).astype(int) >= min_cardinality
 
         # Return a list with the indexes after applying the filters
         indexes = self._df[mask].index.tolist()
         return indexes
 
-    def _init_labels_ids(self) -> dict[str, int]:
+    def _init_label_ids(self) -> dict[str, int]:
         """
         Assigns an id to each label value.
 
@@ -146,7 +189,6 @@ class TaxoDataset(Dataset):
 
         # Assign the ids
         label_ids = {l[1]: l[0] for l in enumerate(unique_values)}
-        # info(f"There is {len(label_ids)} labels available.")
 
         return label_ids
 
@@ -160,23 +202,23 @@ class TaxoDataset(Dataset):
         int
             The count of unique labels.
         """
-        return len(self._labels_ids)
+        return len(self._label_ids_by_name)
 
     @property
-    def labels_names(self) -> list[str]:
+    def label_values(self) -> list[str]:
         """
-        Property to retrieves the names of labels
+        Property to retrieves the values of labels
 
         Returns
         -------
         list of str
-            A list containing the names of all labels.
+            A list containing the values of all labels.
 
         """
-        return list(self._labels_ids.keys())
+        return list(self._label_ids_by_name.keys())
 
     @property
-    def labels_ids(self) -> list[int]:
+    def label_ids(self) -> list[int]:
         """
         Property to retrieve the list of assigned label identifiers.
 
@@ -186,7 +228,7 @@ class TaxoDataset(Dataset):
             A list containing all label identifiers present in the `_labels_ids`
             dictionary.
         """
-        return list(self._labels_ids.values())
+        return list(self._label_ids_by_name.values())
 
     def __len__(self) -> int:
         """
@@ -270,7 +312,7 @@ class TaxoDataset(Dataset):
         # Get label
         label_row = self._df.iloc[idx]
         label = label_row[self.label_column_name]
-        label = self._labels_ids[label]
+        label = self._label_ids_by_name[label]
         label = torch.tensor([label], dtype=torch.long).view(-1)
 
         return encoding, label
@@ -288,14 +330,14 @@ class TaxoDataset(Dataset):
         value = self._df.loc[idx, column_name]
         return value
 
-    def get_label(self, idx: int) -> str:
+    def get_label_value(self, idx: int) -> str:
         label = self._get_column_value(idx, self.label_column_name)
         assert isinstance(label, str), label
         return label
 
     def get_label_id(self, idx: int) -> int:
-        label = self.get_label(idx)
-        label_id  = self._labels_ids[label]
+        label = self.get_label_value(idx)
+        label_id  = self._label_ids_by_name[label]
         return label_id
 
     def get_sequence(self, idx: int) -> str:

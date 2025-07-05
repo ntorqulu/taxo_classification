@@ -7,6 +7,7 @@ from dataset.taxo_dataset import TaxoDataset
 from torch.utils.data import random_split, Subset, DataLoader
 from dataset.utils import warn
 from collections import Counter
+from dataset.utils import info, warn
 
 
 class TaxoDataLoaders:
@@ -21,14 +22,17 @@ class TaxoDataLoaders:
                  max_rows: int | float = 1.,
                  k: int = None,
                  bits: int = None,
+                 value_filters: dict[str, str | list[str]] = None,
+                 min_cardinality_filters: dict[str, int] = None,
                  seq_len_filter: int | None = None,
-                 stratify = None,
                  ):
 
         self.taxo_dataset = TaxoDataset(parquets_path=parquets_path,
                                         label_column_name=label_column_name,
                                         k=k,
                                         bits=bits,
+                                        value_filters=value_filters,
+                                        min_cardinality_filters=min_cardinality_filters,
                                         seq_len_filter=seq_len_filter)
 
         max_rows = self._init_max_rows(max_rows)
@@ -80,7 +84,7 @@ class TaxoDataLoaders:
 
         raise ValueError(f"max_rows has to be a float or an int, not {type(max_rows)}")
 
-    def get_labels(self) -> dict[str, dict[str, tuple[int, float]]]:
+    def get_label_stats(self) -> dict[str, dict[str, tuple[int, float]]]:
         """
         Get label statistics for train, eval and test datasets.
 
@@ -92,15 +96,16 @@ class TaxoDataLoaders:
         Example: {'train': {'class_A': (100, 0.8), 'class_B': (25, 0.2)}}
         """
 
-        labels: dict[str, dict[str, tuple[int, float]]] = {}
+        label_stats: dict[str, dict[str, tuple[int, float]]] = {}
         for ds, name in ((self.train_dataset, 'train'), (self.eval_dataset, 'eval'), (self.test_dataset, 'test')):
             len_ds = len(ds)
-            labels_ds = [self.taxo_dataset.get_label(idx) for idx in ds.indices]
+            labels_ds = [self.taxo_dataset.get_label_value(idx) for idx in ds.indices]
             label_counts = Counter(labels_ds).most_common()
-            labels[name] = {name: (n, n/len_ds) for name, n in label_counts}
-            assert sum(l[0] for l in labels[name].values()) == len_ds
-            assert abs(sum(l[1] for l in labels[name].values()) - 1.0) < 0.1
-        return labels
+            label_stats[name] = {name: (n, n/len_ds) for name, n in label_counts}
+            assert sum(l[0] for l in label_stats[name].values()) == len_ds
+            assert abs(sum(l[1] for l in label_stats[name].values()) - 1.0) < 0.1
+
+        return label_stats
 
     def get_label_weights(self,
                           normalize: bool = True,
@@ -177,4 +182,24 @@ class TaxoDataLoaders:
     def max_sequence_len(self) -> int:
         return self.taxo_dataset.max_sequence_len
 
+    def compare_label_values(self) -> dict[str, dict[str, list[str]] | None]:
+        # Get the label values from the source dataset
+        source_values = set(self.taxo_dataset.label_values)
 
+        results = {}
+        for ds_name, ds in (('train', self.train_dataset), ('eval',self.eval_dataset), ('test',self.test_dataset)):
+            # Get the label values for the current dataset
+            ds_values = [self.taxo_dataset.get_label_value(idx) for idx in ds.indices]
+            ds_values = set(ds_values)
+
+            # Compare values
+            missing_values = ds_values - source_values
+            unknown_values = source_values - ds_values
+
+            # Add the results
+            results[ds_name] = {
+                'missing': list(missing_values),
+                'unknown': list(unknown_values)
+            }
+
+        return results

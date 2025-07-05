@@ -1,5 +1,7 @@
 import os
 import gc
+from xml.sax import default_parser_list
+
 import pandas as pd
 from pathlib import Path
 from dataset.utils import info, warn, get_parquet_file_path
@@ -11,6 +13,7 @@ class CachedDataFrame:
     _bits_encodings: dict[int, pd.DataFrame] = {}
 
     SEQUENCE_COLUMN_NAME = 'sequence'
+    LEVEL_COLUMN_NAME_SUFIX = '_name'
 
     @classmethod
     def flush_encodings_cache(cls):
@@ -57,6 +60,7 @@ class CachedDataFrame:
                                         "Please build the Parquet files first using the  ParquetBuilder class")
             cls._df = pd.read_parquet(parquet_file_path)
             cls._parquet_file_path = parquet_file_path
+            info(f"Level column names: {', '.join(cls.get_level_column_names())}")
         elif cls._parquet_file_path != parquet_file_path:
             raise RuntimeError(f"Cached path differs on provided: {parquet_file_path}")
         return cls._df
@@ -87,6 +91,12 @@ class CachedDataFrame:
             df = cls._get_encodings_df(parquet_file_path, k, bits)
         assert df is not None
         return df
+
+    @classmethod
+    def get_level_column_names(cls) -> list[str]:
+        assert CachedDataFrame._df is not None
+        lcn = [c for c in CachedDataFrame._df.columns if c.endswith(CachedDataFrame.LEVEL_COLUMN_NAME_SUFIX)]
+        return lcn
 
     @classmethod
     def get_length(cls) -> int:
