@@ -18,6 +18,8 @@ class CascadeHierarchicalModel(BaseModel):
                 input_size: int,
                 shared_hidden_sizes: List[int] = [512, 256],
                 level_specific_sizes: Optional[Dict[str, List[int]]] = None,
+                num_classes_per_level: Optional[Dict[str, int]] = None,
+                target_levels: Optional[List[str]] = None,
                 dropout: float = 0.3,
                 use_confidence_weighting: bool = True,
                 name: str = "CascadeHierarchicalModel"):
@@ -27,13 +29,22 @@ class CascadeHierarchicalModel(BaseModel):
         self.dropout = dropout
         self.use_confidence_weighting = use_confidence_weighting
         
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        
         # Default level-specific sizes if not provided
         if level_specific_sizes is None:
             level_specific_sizes = {
                 'kingdom_name': [128, 64],
                 'phylum_name': [128, 64], 
                 'class_name': [128, 64],
-                'order_name': [128, 64]
+                'order_name': [128, 64],
+                'family_name': [128, 64],
+                'genus_name': [128, 64],
+                'species_name': [128, 64]
             }
         self.level_specific_sizes = level_specific_sizes
         
@@ -46,13 +57,17 @@ class CascadeHierarchicalModel(BaseModel):
         
         # Build cascade components
         self.cascade_components = nn.ModuleDict()
-        self.cascade_order = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        self.cascade_order = self.target_levels  # Use target_levels as cascade order
         
         for i, level in enumerate(self.cascade_order):
-            if level not in TAXONOMY_LABELS:
+            # Use provided num_classes_per_level or fall back to hardcoded values
+            if num_classes_per_level and level in num_classes_per_level:
+                num_classes = num_classes_per_level[level]
+            elif level in TAXONOMY_LABELS:
+                num_classes = len(TAXONOMY_LABELS[level])
+            else:
+                # Skip levels that don't have class information
                 continue
-                
-            num_classes = len(TAXONOMY_LABELS[level])
             
             # Determine input size for this level
             if i == 0:
@@ -61,7 +76,12 @@ class CascadeHierarchicalModel(BaseModel):
             else:
                 # Subsequent levels use shared features + parent probabilities
                 parent_level = self.cascade_order[i-1]
-                parent_classes = len(TAXONOMY_LABELS[parent_level])
+                if num_classes_per_level and parent_level in num_classes_per_level:
+                    parent_classes = num_classes_per_level[parent_level]
+                elif parent_level in TAXONOMY_LABELS:
+                    parent_classes = len(TAXONOMY_LABELS[parent_level])
+                else:
+                    parent_classes = 0
                 level_input_size = shared_hidden_sizes[-1] + parent_classes
             
             # Build level-specific layers
@@ -107,7 +127,8 @@ class CascadeHierarchicalModel(BaseModel):
         current_features = shared_features
         
         for i, level in enumerate(self.cascade_order):
-            if level not in TAXONOMY_LABELS:
+            # Skip levels that don't have output heads
+            if level not in self.cascade_components:
                 continue
                 
             # Determine input for this level
@@ -117,20 +138,24 @@ class CascadeHierarchicalModel(BaseModel):
             else:
                 # Subsequent levels use shared features + parent probabilities
                 parent_level = self.cascade_order[i-1]
-                parent_output = outputs[parent_level]
-                parent_probs = F.softmax(parent_output, dim=1)
-                
-                # Apply confidence weighting if enabled
-                if self.use_confidence_weighting:
-                    parent_confidence = torch.max(parent_probs, dim=1, keepdim=True)[0]
-                    confidence_layer = self.cascade_components[f'{level}_confidence']  # type: ignore
-                    confidence_weight = confidence_layer(parent_confidence)
-                    # Apply sigmoid to ensure positive weights
-                    confidence_weight = torch.sigmoid(confidence_weight)
-                    parent_probs = parent_probs * confidence_weight
-                
-                # Concatenate shared features with parent probabilities
-                level_input = torch.cat([current_features, parent_probs], dim=1)
+                if parent_level in outputs:
+                    parent_output = outputs[parent_level]
+                    parent_probs = F.softmax(parent_output, dim=1)
+                    
+                    # Apply confidence weighting if enabled
+                    if self.use_confidence_weighting and f'{level}_confidence' in self.cascade_components:
+                        parent_confidence = torch.max(parent_probs, dim=1, keepdim=True)[0]
+                        confidence_layer = self.cascade_components[f'{level}_confidence']
+                        confidence_weight = confidence_layer(parent_confidence)
+                        # Apply sigmoid to ensure positive weights
+                        confidence_weight = torch.sigmoid(confidence_weight)
+                        parent_probs = parent_probs * confidence_weight
+                    
+                    # Concatenate shared features with parent probabilities
+                    level_input = torch.cat([current_features, parent_probs], dim=1)
+                else:
+                    # If parent level is not available, use only shared features
+                    level_input = current_features
             
             # Apply level-specific layers
             level_layers = self.cascade_components[level]
@@ -176,6 +201,8 @@ class CascadeHierarchicalModel(BaseModel):
             input_size=config['input_size'],
             shared_hidden_sizes=config['shared_hidden_sizes'],
             level_specific_sizes=config.get('level_specific_sizes'),
+            num_classes_per_level=config.get('num_classes_per_level'),
+            target_levels=config.get('target_levels'),
             dropout=config.get('dropout', 0.3),
             use_confidence_weighting=config.get('use_confidence_weighting', True),
             name=config.get('name', 'CascadeHierarchicalModel')
@@ -194,6 +221,7 @@ class CascadeLoss(nn.Module):
     
     def __init__(self, 
                 level_weights: Optional[Dict[str, float]] = None,
+                target_levels: Optional[List[str]] = None,
                 cascade_weight: float = 0.1,
                 confidence_weight: float = 0.05):
         """
@@ -201,23 +229,28 @@ class CascadeLoss(nn.Module):
         
         Args:
             level_weights: Dictionary mapping taxonomic levels to their loss weights
+            target_levels: List of taxonomic levels to include in loss calculation
             cascade_weight: Weight for cascade consistency loss
             confidence_weight: Weight for confidence regularization
         """
         super().__init__()
         
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        
         # Default equal weights if not provided
         if level_weights is None:
-            level_weights = {level: 1.0 for level in TAXONOMY_LEVELS}
+            level_weights = {level: 1.0 for level in self.target_levels}
         self.level_weights = level_weights
+        
         self.cascade_weight = cascade_weight
         self.confidence_weight = confidence_weight
         
         # Classification loss
-        self.criterion = nn.CrossEntropyLoss()
-        
-        # Cascade order
-        self.cascade_order = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+        self.classification_criterion = nn.CrossEntropyLoss()
     
     def _cascade_consistency_loss(self, predictions: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
@@ -227,9 +260,9 @@ class CascadeLoss(nn.Module):
         """
         consistency_loss = torch.tensor(0.0, device=next(iter(predictions.values())).device)
         
-        for i in range(1, len(self.cascade_order)):
-            child_level = self.cascade_order[i]
-            parent_level = self.cascade_order[i-1]
+        for i in range(1, len(self.target_levels)):
+            child_level = self.target_levels[i]
+            parent_level = self.target_levels[i-1]
             
             if child_level in predictions and parent_level in predictions:
                 parent_probs = F.softmax(predictions[parent_level], dim=1)
@@ -254,7 +287,7 @@ class CascadeLoss(nn.Module):
         """
         confidence_loss = torch.tensor(0.0, device=next(iter(predictions.values())).device)
         
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in predictions:
                 probs = F.softmax(predictions[level], dim=1)
                 max_probs = torch.max(probs, dim=1)[0]
@@ -277,9 +310,9 @@ class CascadeLoss(nn.Module):
         """
         # Classification loss
         classification_loss = 0.0
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in predictions and level in targets:
-                level_loss = self.criterion(predictions[level], targets[level])
+                level_loss = self.classification_criterion(predictions[level], targets[level])
                 classification_loss += self.level_weights[level] * level_loss
         
         # Cascade consistency loss
@@ -303,39 +336,44 @@ class CascadeAccuracy:
     
     @staticmethod
     def compute_accuracy(predictions: Dict[str, torch.Tensor], 
-                        targets: Dict[str, torch.Tensor]) -> Dict[str, float]:
+                        targets: Dict[str, torch.Tensor],
+                        target_levels: Optional[List[str]] = None) -> Dict[str, float]:
         """
         Compute accuracy for each taxonomic level.
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to compute accuracy for
             
         Returns:
             Dictionary mapping taxonomic levels to their accuracies
         """
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
+            
         accuracies = {}
         
-        for level in TAXONOMY_LEVELS:
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 correct = pred.eq(targets[level]).sum().item()
                 total = targets[level].size(0)
                 accuracies[level] = correct / total if total > 0 else 0.0
-            else:
-                accuracies[level] = 0.0
         
         return accuracies
     
     @staticmethod
     def compute_hierarchical_accuracy(predictions: Dict[str, torch.Tensor], 
-                                    targets: Dict[str, torch.Tensor]) -> float:
+                                    targets: Dict[str, torch.Tensor],
+                                    target_levels: Optional[List[str]] = None) -> float:
         """
         Compute hierarchical accuracy (all levels correct).
         
         Args:
             predictions: Dictionary of predictions for each taxonomic level
             targets: Dictionary of targets for each taxonomic level
+            target_levels: List of taxonomic levels to include in hierarchical accuracy
             
         Returns:
             Hierarchical accuracy (fraction of samples where all levels are correct)
@@ -343,10 +381,17 @@ class CascadeAccuracy:
         if not predictions or not targets:
             return 0.0
         
-        # Get predictions and targets for all levels
-        all_correct = torch.ones(targets[list(targets.keys())[0]].size(0), dtype=torch.bool, device=targets[list(targets.keys())[0]].device)
+        if target_levels is None:
+            target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
         
-        for level in TAXONOMY_LEVELS:
+        # Get the first level to determine batch size
+        first_level = list(predictions.keys())[0]
+        batch_size = predictions[first_level].size(0)
+        
+        # Check if all levels are correct for each sample
+        all_correct = torch.ones(batch_size, dtype=torch.bool, device=predictions[first_level].device)
+        
+        for level in target_levels:
             if level in predictions and level in targets:
                 pred = predictions[level].argmax(dim=1)
                 level_correct = pred.eq(targets[level])

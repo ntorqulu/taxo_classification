@@ -28,6 +28,7 @@ class HierarchicalTrainer:
                 log_dir: Optional[str] = None,
                 checkpoint_dir: Optional[str] = None,
                 class_names_per_level: Optional[Dict[str, List[str]]] = None,
+                target_levels: Optional[List[str]] = None,
                 from_checkpoint: bool = False,
                 from_checkpoint_path: Optional[str] = None):
         """
@@ -42,6 +43,7 @@ class HierarchicalTrainer:
             log_dir: Directory for TensorBoard logs
             checkpoint_dir: Directory for model checkpoints
             class_names_per_level: Dictionary mapping taxonomic levels to their class names
+            target_levels: List of taxonomic levels to train on
             from_checkpoint: Whether to load from checkpoint
             from_checkpoint_path: Path to checkpoint file
         """
@@ -53,6 +55,12 @@ class HierarchicalTrainer:
         self.class_names_per_level = class_names_per_level or {}
         self.from_checkpoint = from_checkpoint
         self.from_checkpoint_path = from_checkpoint_path
+        
+        # Use target_levels if provided, otherwise use basic levels
+        if target_levels is not None:
+            self.target_levels = target_levels
+        else:
+            self.target_levels = ['kingdom_name', 'phylum_name', 'class_name', 'order_name']
         
         # Create mapping from index to class name for each level
         self.class_idx_to_name_per_level = {}
@@ -84,8 +92,8 @@ class HierarchicalTrainer:
         """
         self.model.train()
         total_loss = 0.0
-        level_correct = {level: 0 for level in TAXONOMY_LEVELS}
-        level_total = {level: 0 for level in TAXONOMY_LEVELS}
+        level_correct = {level: 0 for level in self.target_levels}
+        level_total = {level: 0 for level in self.target_levels}
         
         # Get the total dataset size
         dataset_size = len(train_loader.dataset)
@@ -114,7 +122,7 @@ class HierarchicalTrainer:
             total_loss += loss.item()
             
             # Compute accuracy for each level
-            for level in TAXONOMY_LEVELS:
+            for level in self.target_levels:
                 if level in predictions and level in targets:
                     pred = predictions[level].argmax(dim=1)
                     correct = pred.eq(targets[level]).sum().item()
@@ -124,7 +132,7 @@ class HierarchicalTrainer:
             # Log batch results
             if batch_idx % 10 == 0:
                 batch_accuracies = {}
-                for level in TAXONOMY_LEVELS:
+                for level in self.target_levels:
                     if level_total[level] > 0:
                         batch_accuracies[level] = 100. * level_correct[level] / level_total[level]
                 
@@ -135,7 +143,7 @@ class HierarchicalTrainer:
         # Compute averages
         avg_loss = total_loss / len(train_loader)
         avg_accuracies = {}
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level_total[level] > 0:
                 avg_accuracies[level] = level_correct[level] / level_total[level]
             else:
@@ -165,9 +173,9 @@ class HierarchicalTrainer:
         
         self.model.eval()
         total_loss = 0.0
-        level_predictions = {level: [] for level in TAXONOMY_LEVELS}
-        level_targets = {level: [] for level in TAXONOMY_LEVELS}
-        level_logits = {level: [] for level in TAXONOMY_LEVELS}  # Store logits for hierarchical accuracy
+        level_predictions = {level: [] for level in self.target_levels}
+        level_targets = {level: [] for level in self.target_levels}
+        level_logits = {level: [] for level in self.target_levels}  # Store logits for hierarchical accuracy
         
         for batch in val_loader:
             # Move data to device
@@ -184,7 +192,7 @@ class HierarchicalTrainer:
             total_loss += loss.item()
             
             # Collect predictions and targets for each level
-            for level in TAXONOMY_LEVELS:
+            for level in self.target_levels:
                 if level in predictions and level in targets:
                     pred = predictions[level].argmax(dim=1)
                     level_predictions[level].extend(pred.cpu().numpy())
@@ -199,7 +207,7 @@ class HierarchicalTrainer:
         level_accuracies = {}
         level_metrics = {}
         
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level_predictions[level] and level_targets[level]:
                 metrics = compute_metrics(level_targets[level], level_predictions[level])
                 level_accuracies[level] = metrics['accuracy']
@@ -212,20 +220,20 @@ class HierarchicalTrainer:
         # Concatenate logits from all batches
         hierarchical_logits = {}
         hierarchical_targets = {}
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level_logits[level]:
                 hierarchical_logits[level] = torch.cat(level_logits[level], dim=0)
                 hierarchical_targets[level] = torch.tensor(level_targets[level])
         
         hierarchical_acc = HierarchicalAccuracy.compute_hierarchical_accuracy(
-            hierarchical_logits, hierarchical_targets
+            hierarchical_logits, hierarchical_targets, target_levels=self.target_levels
         )
         
         # Log to TensorBoard
         self.writer.add_scalar(f'Loss/{prefix}', avg_loss, epoch)
         self.writer.add_scalar(f'Hierarchical_Accuracy/{prefix}', hierarchical_acc, epoch)
         
-        for level in TAXONOMY_LEVELS:
+        for level in self.target_levels:
             if level in level_accuracies:
                 self.writer.add_scalar(f'Accuracy/{level}/{prefix}', level_accuracies[level], epoch)
                 if level in level_metrics:
@@ -436,15 +444,15 @@ class HierarchicalTrainer:
             Dictionary mapping taxonomic levels to their predictions
         """
         self.model.eval()
-        predictions = {level: [] for level in TAXONOMY_LEVELS}
-        probabilities = {level: [] for level in TAXONOMY_LEVELS}
+        predictions = {level: [] for level in self.target_levels}
+        probabilities = {level: [] for level in self.target_levels}
         
         with torch.no_grad():
             for batch in data_loader:
                 features = batch['features'].to(self.device)
                 batch_predictions = self.model(features)
                 
-                for level in TAXONOMY_LEVELS:
+                for level in self.target_levels:
                     if level in batch_predictions:
                         # Get class predictions
                         pred = batch_predictions[level].argmax(dim=1)

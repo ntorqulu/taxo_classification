@@ -126,8 +126,13 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
                 'kingdom_name': [128, 64],
                 'phylum_name': [128, 64],
                 'class_name': [128, 64],
-                'order_name': [128, 64]
+                'order_name': [128, 64],
+                'family_name': [128, 64],
+                'genus_name': [128, 64],
+                'species_name': [128, 64]
             }),
+            num_classes_per_level=kwargs.get("num_classes_per_level"),
+            target_levels=kwargs.get("target_levels"),
             dropout=kwargs.get("dropout", 0.3),
             name=kwargs.get("name", "HierarchicalModel"),
         )
@@ -143,8 +148,13 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
                 'kingdom_name': [128, 64],
                 'phylum_name': [128, 64],
                 'class_name': [128, 64],
-                'order_name': [128, 64]
+                'order_name': [128, 64],
+                'family_name': [128, 64],
+                'genus_name': [128, 64],
+                'species_name': [128, 64]
             }),
+            num_classes_per_level=kwargs.get("num_classes_per_level"),
+            target_levels=kwargs.get("target_levels"),
             dropout=kwargs.get("dropout", 0.3),
             use_confidence_weighting=kwargs.get("use_confidence_weighting", True),
             name=kwargs.get("name", "CascadeHierarchicalModel"),
@@ -159,6 +169,8 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
             hidden_sizes=kwargs.get("hidden_sizes", [256, 128]),
             gnn_layers=kwargs.get("gnn_layers", 2),
             use_attention=kwargs.get("use_attention", True),
+            num_classes_per_level=kwargs.get("num_classes_per_level"),
+            target_levels=kwargs.get("target_levels"),
             dropout=kwargs.get("dropout", 0.3),
             name=kwargs.get("name", "GNNHierarchicalModel"),
         )

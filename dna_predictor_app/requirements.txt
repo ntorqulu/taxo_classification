@@ -1,0 +1,8 @@
+flask
+torch
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+# Add any other dependencies from your src/requirements.txt if needed
