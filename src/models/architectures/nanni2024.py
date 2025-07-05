@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as f # add import torch.nn.functional
+import torch.nn.functional as f  # add import torch.nn.functional
 from networkx import config
 
 from models.architectures.base_model import BaseModel
@@ -274,3 +274,90 @@ class nanni_att(BaseModel):
 
 #     2025-06-18 14:49:51 INFO     Starting training for 50 epochs
 # 2025-06-18 14:49:52 INFO     Train Epoch: 1 [0/357188] Loss: 2.775197, Acc: 3.33%
+
+
+class nanni_att_kmer(BaseModel):
+    # - flattenConverts the multi-dimensional input into a 1D
+    #   vector by flattening the spatial dimensions.
+    # - selfAttentionLayer(8,64): A layer that applies self-attention, which allows the network
+    #   to focus on different parts of the input. Parameters: Number of attention heads = 8.
+    #   Size of the projection = 64. -> MultiheadAttention(emb_dim = mida output flatten layer 4*n, num_heads = 8, dropout = 0,)
+    # - bilstmLayer(100):Bidirectional Long Short-Term Memory layer; a recurrent layer that
+    #   can process sequences in both forward and backward directions. Each BiLSTM cell
+    #   has 100 hidden units.
+    # - batchNormalizationLayer: It improves model convergence and stabilizes the training
+    #   process by standardizing the inputs to each layer.
+    # - fullyConnectedLayer(numClasses): A fully connected layer that maps the output from
+    #   the BiLSTM layer to the number of classes in the classification task.
+    # - Softmax: The softmax activation layer normalizes the output into a probability distri-
+    # bution over the classes.
+
+    def __init__(
+        self,
+        input_size: int,
+        output_size: int,
+        num_heads: int = 8,
+        embed_dim: int = 64,
+        hidden_size: int = 100,
+        batch_size: int = 30,
+        name: str = "nanni_att_kmer",
+    ):
+        super().__init__(name=name)
+        self.input_size = input_size
+        self.output_size = output_size
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
+
+        self.input_projection = nn.Linear(input_size, self.embed_dim)
+        self.self_attention = nn.MultiheadAttention(
+            embed_dim=self.embed_dim, num_heads=self.num_heads, batch_first=True
+        )
+        self.bilstm = nn.LSTM(
+            input_size=embed_dim, hidden_size=self.hidden_size, num_layers=1, batch_first=True, bidirectional=True
+        )
+        self.layer_norm = nn.LayerNorm(normalized_shape=2 * self.hidden_size)  # 100*2 por bidireccional
+        self.fc = nn.Linear(2 * self.hidden_size, self.output_size)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.input_projection(x)
+        x, att_weights = self.self_attention(x, x, x)
+        x, _ = self.bilstm(x)
+        x = self.layer_norm(x)
+        x = self.fc(x)
+        return x
+
+    def get_config(self) -> Dict[str, Any]:
+        config = super().get_config()
+        config.update(
+            {
+                "input_size": self.input_size,
+                "output_size": self.output_size,
+                "num_heads": self.num_heads,
+                "embed_dim": self.embed_dim,
+                "hidden_size": self.hidden_size,
+                "batch_size": self.batch_size,
+                "name": self.name,
+            }
+        )
+        return config
+
+    @classmethod
+    def load(cls, path: str, map_location: Optional[str] = None) -> "nanni_att_kmer":
+        checkpoint = torch.load(path, map_location=map_location)
+        config = checkpoint["model_config"]
+
+        model = cls(
+            input_size=config["input_size"],
+            output_size=config["output_size"],
+            num_heads=config["num_heads"],
+            embed_dim=config["embed_dim"],
+            hidden_size=config["hidden_size"],
+            batch_size=config["batch_size"],
+            name=config["name"],
+        )
+
+        model.load_state_dict(checkpoint["model_state_dict"])
+        return model

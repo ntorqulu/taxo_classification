@@ -1,15 +1,14 @@
 import argparse
 import json
 import os
+import re
 import time
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-import json
-import os
-import argparse
 
 from torch.utils.tensorboard import SummaryWriter
 from dataset.cached_dataframe import CachedDataFrame
@@ -18,7 +17,6 @@ from dataset.taxo_dataloaders import TaxoDataLoaders
 from models.training.singlerank_trainer import Trainer
 from constants.taxonomy_labels import get_class_names, wrong_class_values
 from models.utils.model_factory import create_model
-from typing import Any
 
 
 def init_device(seed: int = 42) -> torch.device:
@@ -29,7 +27,6 @@ def init_device(seed: int = 42) -> torch.device:
         torch.cuda.manual_seed(seed)
         d = torch.device("cuda")
     elif torch.backends.mps.is_available():  # For Apple Silicon (M1/M2/M3/M4)
-        torch.backends.mps.enable_prior_normalization = True
         d = torch.device("mps")
         info("Using Apple Metal Performance Shaders (MPS) backend")
     elif torch.xpu.is_available():
@@ -56,8 +53,8 @@ def run_experiment(hparams: dict) -> dict:
     device = init_device(hparams.get("seed", 42))
 
     # Load data
-    parquets_path = hparams['parquets_path'] if hparams['parquets_path'] else get_base_parquets_path()
-    dataset_name = hparams['dataset_name']
+    parquets_path = hparams["parquets_path"] if hparams["parquets_path"] else get_base_parquets_path()
+    dataset_name = hparams["dataset_name"]
 
     taxo_data_loaders = TaxoDataLoaders(
         parquets_path=Path(parquets_path) / dataset_name,
@@ -76,32 +73,32 @@ def run_experiment(hparams: dict) -> dict:
     labels = taxo_data_loaders.get_labels()
     level_name = hparams["label_column_name"]
 
-    for ds in ('train', 'eval', 'test'):
+    for ds in ("train", "eval", "test"):
         results = wrong_class_values(level_name=level_name, values=list(labels[ds].keys()))
         if not results:
             info(f"Label values in {ds} dataset are valid")
             continue
-        if results['missing']:
+        if results["missing"]:
             warn(f"Missing label values found in {ds} dataset: {results['missing']}")
-        if results['unknown']:
+        if results["unknown"]:
             warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
 
     # Log a summary of the label values and stratificacion
 
-    summary = { }
-    summary_total = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
-    for ds in ('train', 'eval', 'test'):
+    summary = {}
+    summary_total = {"train": (0, 0.0), "eval": (0, 0.0), "test": (0, 0.0)}
+    for ds in ("train", "eval", "test"):
         for name, (count, pct) in labels[ds].items():
             if name not in summary:
-                summary[name] = {'train': (0,0), 'eval': (0,0), 'test': (0,0)}
+                summary[name] = {"train": (0, 0.0), "eval": (0, 0.0), "test": (0, 0.0)}
             summary[name][ds] = (count, pct)
-            summary_total[ds] = (summary_total[ds][0]+count, summary_total[ds][1]+pct)
-    summary[' '] = summary_total
+            summary_total[ds] = (summary_total[ds][0] + count, summary_total[ds][1] + pct)
+    summary[" "] = summary_total
     name_max_len = max(len(v[0]) for v in labels[ds].items())
     info(f"{' '*(name_max_len+2)} {'train':^15}  {'eval':^15}  {'test':^15}")
     for name in summary.keys():
         line = f"{name:<{name_max_len+2}} "
-        for ds in ('train', 'eval', 'test'):
+        for ds in ("train", "eval", "test"):
             line += f"{summary[name][ds][0]:>7} {100*summary[name][ds][1]:>6.2f}% "
         info(line)
 
@@ -114,11 +111,11 @@ def run_experiment(hparams: dict) -> dict:
     info(f"Filtered dataset - {taxo_data_loaders.dataset_length}")
     info(f"Filtered dataset - Min sequence length: {taxo_data_loaders.min_sequence_len}")
     info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
-    
+
     # Create model using factory
     model_params: dict[str, Any] = {
-        'input_size': taxo_data_loaders.data_length,
-        'output_size': taxo_data_loaders.num_labels,
+        "input_size": taxo_data_loaders.data_length,
+        "output_size": taxo_data_loaders.num_labels,
     }
 
     # Add model-specific parameters based on model type
@@ -221,6 +218,13 @@ def run_experiment(hparams: dict) -> dict:
         else f"{model.name}_{hparams['label_column_name']}_bits{hparams['bits']}"
     )
     log_dir = os.path.join("runs", run_name)
+    if hparams.get("from_checkpoint", False):
+        from_checkpoint_path = hparams.get("from_checkpoint_path", None)
+        if from_checkpoint_path is None:
+            raise ValueError("If from_checkpoint is True, from_checkpoint_path must be given.")
+    else:
+        from_checkpoint_path = None
+        
     checkpoint_dir = os.path.join("checkpoints", run_name)
 
     class_names = get_class_names(hparams["label_column_name"])
@@ -248,6 +252,8 @@ def run_experiment(hparams: dict) -> dict:
         log_dir=log_dir,
         checkpoint_dir=checkpoint_dir,
         class_names=class_names,
+        from_checkpoint=hparams.get("from_checkpoint", False),
+        from_checkpoint_path=from_checkpoint_path,
     )
 
     # Train model
@@ -255,11 +261,11 @@ def run_experiment(hparams: dict) -> dict:
         train_loader=taxo_data_loaders.train_loader,
         val_loader=taxo_data_loaders.eval_loader,
         test_loader=taxo_data_loaders.test_loader,
-        epochs=hparams.get('epochs', 15),
-        patience=hparams.get('patience', 5),
+        epochs=hparams.get("epochs", 15),
+        patience=hparams.get("patience", 5),
         save_best=True,
-        fast_mode=hparams.get('fast_mode', False),
-        eval_frequency=hparams.get('eval_frequency', 1)
+        fast_mode=hparams.get("fast_mode", False),
+        eval_frequency=hparams.get("eval_frequency", 1),
     )
 
     return {"model": model, "history": history, "run_name": run_name}
@@ -281,13 +287,24 @@ def check_available_devices():
 def main():
     check_available_devices()
     # Set up command line arguments
-    parser = argparse.ArgumentParser(description='Train taxonomy classification models')
-    parser.add_argument('--config', type=str, default='hyperparams/kmer_hparams.json', help='Path to hyperparameters JSON file')
-    parser.add_argument('--model_type', type=str, choices=['basic', 'enhanced_mlp', 'cnn', 'nanni_cnn1', 'nanni_cnn2', 'nanni_att', 'bert'],
-                       help='Model type to train')
-    parser.add_argument('--fast', action='store_true', help='Enable fast evaluation mode')
-    parser.add_argument('--eval_freq', type=int, default=1, help='Frequency of detailed evaluation')
-    parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
+    parser = argparse.ArgumentParser(description="Train taxonomy classification models")
+    parser.add_argument(
+        "--config", type=str, default="hyperparams/kmer_hparams.json", help="Path to hyperparameters JSON file"
+    )
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        choices=["basic", "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2", "nanni_att", "nanni_att_kmer", "bert"],
+        help="Model type to train",
+    )
+    parser.add_argument("--fast", action="store_true", help="Enable fast evaluation mode")
+    parser.add_argument("--eval_freq", type=int, default=1, help="Frequency of detailed evaluation")
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default=DEFAULT_DATASET_NAME,
+        help="Directory containing dataset files. Defaults to filtered_ranks",
+    )
     args = parser.parse_args()
 
     # Load hyperparameters
@@ -301,20 +318,19 @@ def main():
         info(f"Model type: {args.model_type}")
 
     if args.fast:
-        hparams['fast_mode'] = True
+        hparams["fast_mode"] = True
         info("Fast evaluation mode enabled")
-    
+
     if args.eval_freq != 1:
-        hparams['eval_frequency'] = args.eval_freq
+        hparams["eval_frequency"] = args.eval_freq
         info(f"Detailed evaluation will run every {args.eval_freq} epochs")
-        
+
     # Set default dataset path if not provided
-    if hparams['parquets_path'] == "":
-        hparams['parquets_path'] = get_base_parquets_path()
+    if hparams["parquets_path"] == "":
+        hparams["parquets_path"] = get_base_parquets_path()
 
     if args.dataset_name:
-        hparams['dataset_name'] = args.dataset_name
-
+        hparams["dataset_name"] = args.dataset_name
 
     # Track timing
     t0 = time.time()
