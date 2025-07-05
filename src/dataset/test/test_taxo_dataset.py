@@ -22,14 +22,14 @@ test_filter_key = test_label_column_name
 sequencecoder = SequenceCoder()
 parquets_path = get_base_parquets_path() / DEFAULT_DATASET_NAME
 
-def Xtest_init_label_column_name():
+def test_init_label_column_name():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name="non_existent_column", k=1)
 
     for label_column_name in CachedDataFrame.get_level_column_names():
         TaxoDataset(parquets_path=parquets_path, label_column_name=label_column_name, k=1)
 
-def Xtest_init_k():
+def test_init_k():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=-1)
 
@@ -39,7 +39,7 @@ def Xtest_init_k():
     TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
 
-def Xtest_init_bits():
+def test_init_bits():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, bits=-1)
 
@@ -47,14 +47,14 @@ def Xtest_init_bits():
     TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, bits=1)
 
 
-def Xtest_init_k_bits():
+def test_init_k_bits():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name)
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, bits=1)
 
 
-def Xtest_init_value_filters():
+def test_init_value_filters():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
                     value_filters={"non_existent_column":"xx"})
@@ -69,7 +69,7 @@ def Xtest_init_value_filters():
     TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
                 value_filters={l:"x" for l in CachedDataFrame.get_level_column_names()})
 
-def Xtest_init_min_cardinality_filters():
+def test_init_min_cardinality_filters():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1,
                     min_cardinality_filters={"non_existent_column":1})
@@ -90,7 +90,7 @@ def Xtest_init_min_cardinality_filters():
                 min_cardinality_filters={l:10 for l in CachedDataFrame.get_level_column_names()})
 
 
-def Xtest_init_seq_len_filter():
+def test_init_seq_len_filter():
     with pytest.raises(ValueError):
         TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, seq_len_filter=-1)
 
@@ -102,12 +102,12 @@ def Xtest_init_seq_len_filter():
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, seq_len_filter=l)
         assert len(t) == len([t for t in t._df[CachedDataFrame.SEQUENCE_COLUMN_NAME] if len(t) == l])
 
-def Xtest_init_indexes_basic():
+def test_init_indexes_basic():
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
     assert t._filter_indexes is None
 
 
-def Xtest_init_indexes_one_column():
+def test_init_indexes_one_column():
     # Test all filters with all the values
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
@@ -121,7 +121,7 @@ def Xtest_init_indexes_one_column():
             assert (t._df[column_name] == value).sum() == len(t._filter_indexes), f"{column_name}={value}"
 
 
-def Xtest_init_indexes_multiple_columns():
+def test_init_indexes_multiple_columns():
     # Test all columns with the first value
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
@@ -137,14 +137,14 @@ def Xtest_init_indexes_multiple_columns():
                 assert t._filter_indexes is not None
                 assert len(df_tmp) == len(t._filter_indexes), f"{len(df_tmp) }={len(t._filter_indexes)}"
 
-def Xtest_init_labels_ids_non_filtered():
+def test_init_labels_ids_non_filtered():
     for label_column_name in CachedDataFrame.get_level_column_names():
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=label_column_name, k=1)
         assert len(t.label_ids) == len(t._df[label_column_name].unique().tolist())
         assert len(t.label_ids) == t.num_labels
 
 
-def Xtest_init_labels_ids_value_filtered():
+def test_init_labels_ids_value_filtered():
     t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1)
 
     for column_name in CachedDataFrame.get_level_column_names():
@@ -158,16 +158,16 @@ def Xtest_init_labels_ids_value_filtered():
             assert len(t.label_ids) == t.num_labels
 
 
-def Xtest_num_labels():
+def test_num_labels():
     # Implemented in test_init_labels_ids_non_filtered
     pass
 
 
-def Xtest_len():
+def test_len():
     # Tested on other tests
     pass
 
-def Xtest_min_max_sequencelen():
+def test_min_max_sequencelen():
     range_min_max = range(CachedDataFrame.get_min_sequence_len(), CachedDataFrame.get_max_sequence_len()+1)
     for seq_len_filter in [None] + list(range_min_max):
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=1, seq_len_filter=seq_len_filter)
@@ -176,14 +176,14 @@ def Xtest_min_max_sequencelen():
         assert t.min_sequence_len == min_seq, f"{t.min_sequence_len} != {min_seq}"
         assert t.max_sequence_len == max_seq, f"{t.max_sequence_len} != {max_seq}"
 
-def Xtest_getitem_k():
+def test_getitem_k():
     for k in ParquetBuilder.KMERS_SIZES:
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, k=k)
         d, v = t[1]
         assert isinstance(d, Tensor)
         assert isinstance(v, Tensor)
 
-def Xtest_getitem_bits():
+def test_getitem_bits():
     for b in sequencecoder.bit_mapping:
         t = TaxoDataset(parquets_path=parquets_path, label_column_name=test_label_column_name, bits=b)
         d, v = t[1]
@@ -195,7 +195,7 @@ def Xtest_getitem_bits():
     assert isinstance(d, Tensor)
     assert isinstance(v, Tensor)
 
-def Xtest_get_label_id():
+def test_get_label_id():
     assert 1 == 0
 
 def test_min_cardinality_filters():

@@ -9,6 +9,7 @@ from dataset.cached_dataframe import CachedDataFrame
 from dataset.parquet_builder import ParquetBuilder
 from feature_extraction.main import SequenceCoder
 from dataset.utils import info
+from collections import Counter
 
 class TaxoDataset(Dataset):
     # Discared columns seqID,taxID,scientific_name
@@ -128,8 +129,11 @@ class TaxoDataset(Dataset):
 
         # Dictionary with the mapping between label strings and their assigned IDs.
         self._label_ids_by_name: dict[str, int] = self._init_label_ids()
+        info(f"There are {len(self.label_ids)} label values in '{self.label_column_name}': {', '.join(self.label_values)}")
 
-        info(f"There are {len(self.label_ids)} labels values: {', '.join(self.label_values)}")
+        self._label_cardinality_by_name: dict[str, int] = self._init_label_cardinality()
+        info("Distinct values for the labels:")
+        [info(f"  {value}: {cardinality}") for value, cardinality in self._label_cardinality_by_name.items()]
 
     def _init_filter_indexes(self) -> list[int] | None:
         """
@@ -191,6 +195,13 @@ class TaxoDataset(Dataset):
         label_ids = {l[1]: l[0] for l in enumerate(unique_values)}
 
         return label_ids
+
+    def _init_label_cardinality(self) -> dict[str, int]:
+        all_values = self._df[self.label_column_name].tolist()
+        cardinality = Counter(all_values)
+        cardinality = dict(cardinality)
+        cardinality = dict(sorted(cardinality.items(), key=lambda x: x[1], reverse=True)) # Order by value desc
+        return dict(cardinality)
 
     @property
     def num_labels(self) -> int:
