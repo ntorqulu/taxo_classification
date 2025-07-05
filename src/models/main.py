@@ -39,6 +39,55 @@ def init_device(seed: int = 42) -> torch.device:
     info(f"Device: {d}")
     return d
 
+def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
+    # Validate labels
+
+    info(f"Validating labels")
+    results = taxo_data_loaders.compare_label_values()
+    for ds_name in results.keys():
+        ds_results = results[ds_name]
+        if not ds_results['missing'] and not ds_results['unknown']:
+            info(f"Label values in {ds_name} dataset are valid")
+            continue
+
+        if ds_results['missing']:
+            warn(f"Missing label values found in {ds_name} dataset: {ds_results['missing']}")
+
+        if ds_results['unknown']:
+            warn(f"Unknown label values found in {ds_name} dataset: {ds_results['unknown']}")
+
+    # Log a summary of the label values and stratificacion
+
+    label_stats = taxo_data_loaders.get_label_stats()
+
+    summary = {}
+    summary_total = {'train': (0, 0), 'eval': (0, 0), 'test': (0, 0)}
+    for ds_name in ('train', 'eval', 'test'):
+        for name, (count, pct) in label_stats[ds_name].items():
+            if name not in summary:
+                summary[name] = {'train': (0, 0), 'eval': (0, 0), 'test': (0, 0)}
+            summary[name][ds_name] = (count, pct)
+            summary_total[ds_name] = (summary_total[ds_name][0] + count, summary_total[ds_name][1] + pct)
+    summary[' '] = summary_total
+    name_max_len = max(len(v[0]) for v in label_stats[ds_name].items())
+    info(f"{' ' * (name_max_len + 2)} {'train':^15}  {'eval':^15}  {'test':^15}")
+    for name in summary.keys():
+        line = f"{name:<{name_max_len + 2}} "
+        for ds in ('train', 'eval', 'test'):
+            line += f"{summary[name][ds][0]:>7} {100 * summary[name][ds][1]:>6.2f}% "
+        info(line)
+
+    # Log the dataset length and sequence lenghts
+
+    info(f"Full dataset - {CachedDataFrame.get_length()}")
+    info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
+    info(f"Full dataset - Max sequence length: {CachedDataFrame.get_max_sequence_len()}")
+
+    info(f"Filtered dataset - {taxo_data_loaders.dataset_length}")
+    info(f"Filtered dataset - Min sequence length: {taxo_data_loaders.min_sequence_len}")
+    info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
+
+
 
 def run_experiment(hparams: dict) -> dict:
     """
@@ -67,50 +116,7 @@ def run_experiment(hparams: dict) -> dict:
         seq_len_filter=hparams.get("seq_len_filter", None),
     )
 
-    # Validate labels
-
-    info(f"Validating labels")
-    labels = taxo_data_loaders.get_labels()
-    level_name = hparams["label_column_name"]
-
-    for ds in ("train", "eval", "test"):
-        results = wrong_class_values(level_name=level_name, values=list(labels[ds].keys()))
-        if not results:
-            info(f"Label values in {ds} dataset are valid")
-            continue
-        if results["missing"]:
-            warn(f"Missing label values found in {ds} dataset: {results['missing']}")
-        if results["unknown"]:
-            warn(f"Unknown label values found in {ds} dataset: {results['extra']}")
-
-    # Log a summary of the label values and stratificacion
-
-    summary = {}
-    summary_total = {"train": (0, 0), "eval": (0, 0), "test": (0, 0)}
-    for ds in ("train", "eval", "test"):
-        for name, (count, pct) in labels[ds].items():
-            if name not in summary:
-                summary[name] = {"train": (0, 0), "eval": (0, 0), "test": (0, 0)}
-            summary[name][ds] = (count, pct)
-            summary_total[ds] = (summary_total[ds][0] + count, summary_total[ds][1] + pct)
-    summary[" "] = summary_total
-    name_max_len = max(len(v[0]) for v in labels[ds].items())
-    info(f"{' '*(name_max_len+2)} {'train':^15}  {'eval':^15}  {'test':^15}")
-    for name in summary.keys():
-        line = f"{name:<{name_max_len+2}} "
-        for ds in ("train", "eval", "test"):
-            line += f"{summary[name][ds][0]:>7} {100*summary[name][ds][1]:>6.2f}% "
-        info(line)
-
-    # Log the dataset length and sequence lenghts
-
-    info(f"Full dataset - {CachedDataFrame.get_length()}")
-    info(f"Full dataset - Min sequence length: {CachedDataFrame.get_min_sequence_len()}")
-    info(f"Full dataset - Max sequence length: {CachedDataFrame.get_max_sequence_len()}")
-
-    info(f"Filtered dataset - {taxo_data_loaders.dataset_length}")
-    info(f"Filtered dataset - Min sequence length: {taxo_data_loaders.min_sequence_len}")
-    info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
+    log_label_stats(taxo_data_loaders)
 
     # Create model using factory
     model_params: dict[str, Any] = {
