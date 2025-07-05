@@ -27,7 +27,9 @@ class HierarchicalTrainer:
                 scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
                 log_dir: Optional[str] = None,
                 checkpoint_dir: Optional[str] = None,
-                class_names_per_level: Optional[Dict[str, List[str]]] = None):
+                class_names_per_level: Optional[Dict[str, List[str]]] = None,
+                from_checkpoint: bool = False,
+                from_checkpoint_path: Optional[str] = None):
         """
         Initialize hierarchical trainer.
         
@@ -40,6 +42,8 @@ class HierarchicalTrainer:
             log_dir: Directory for TensorBoard logs
             checkpoint_dir: Directory for model checkpoints
             class_names_per_level: Dictionary mapping taxonomic levels to their class names
+            from_checkpoint: Whether to load from checkpoint
+            from_checkpoint_path: Path to checkpoint file
         """
         self.model = model
         self.criterion = criterion
@@ -47,6 +51,8 @@ class HierarchicalTrainer:
         self.device = device
         self.scheduler = scheduler
         self.class_names_per_level = class_names_per_level or {}
+        self.from_checkpoint = from_checkpoint
+        self.from_checkpoint_path = from_checkpoint_path
         
         # Create mapping from index to class name for each level
         self.class_idx_to_name_per_level = {}
@@ -80,6 +86,9 @@ class HierarchicalTrainer:
         total_loss = 0.0
         level_correct = {level: 0 for level in TAXONOMY_LEVELS}
         level_total = {level: 0 for level in TAXONOMY_LEVELS}
+        
+        # Get the total dataset size
+        dataset_size = len(train_loader.dataset)
         
         for batch_idx, batch in enumerate(train_loader):
             # Move data to device
@@ -120,7 +129,7 @@ class HierarchicalTrainer:
                         batch_accuracies[level] = 100. * level_correct[level] / level_total[level]
                 
                 acc_str = ", ".join([f"{level}: {acc:.2f}%" for level, acc in batch_accuracies.items()])
-                info(f'Train Epoch: {epoch} [{batch_idx * len(features)}/N] '
+                info(f'Train Epoch: {epoch} [{batch_idx * len(features)}/{dataset_size}] '
                      f'Loss: {loss.item():.6f}, Acc: {acc_str}')
                 
         # Compute averages
@@ -158,6 +167,7 @@ class HierarchicalTrainer:
         total_loss = 0.0
         level_predictions = {level: [] for level in TAXONOMY_LEVELS}
         level_targets = {level: [] for level in TAXONOMY_LEVELS}
+        level_logits = {level: [] for level in TAXONOMY_LEVELS}  # Store logits for hierarchical accuracy
         
         for batch in val_loader:
             # Move data to device
@@ -179,6 +189,8 @@ class HierarchicalTrainer:
                     pred = predictions[level].argmax(dim=1)
                     level_predictions[level].extend(pred.cpu().numpy())
                     level_targets[level].extend(targets[level].cpu().numpy())
+                    # Store logits for hierarchical accuracy computation
+                    level_logits[level].append(predictions[level].cpu())
         
         # Compute average loss
         avg_loss = total_loss / len(val_loader)
@@ -197,9 +209,16 @@ class HierarchicalTrainer:
                 level_metrics[level] = {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0, 'f1': 0.0}
         
         # Compute hierarchical accuracy (all levels correct)
+        # Concatenate logits from all batches
+        hierarchical_logits = {}
+        hierarchical_targets = {}
+        for level in TAXONOMY_LEVELS:
+            if level_logits[level]:
+                hierarchical_logits[level] = torch.cat(level_logits[level], dim=0)
+                hierarchical_targets[level] = torch.tensor(level_targets[level])
+        
         hierarchical_acc = HierarchicalAccuracy.compute_hierarchical_accuracy(
-            {level: torch.tensor(preds) for level, preds in level_predictions.items()},
-            {level: torch.tensor(targets) for level, targets in level_targets.items()}
+            hierarchical_logits, hierarchical_targets
         )
         
         # Log to TensorBoard
@@ -250,17 +269,34 @@ class HierarchicalTrainer:
         best_val_loss = float('inf')
         best_hierarchical_acc = 0.0
         patience_counter = 0
+        best_epoch = 0
+        best_model_state = None
         
         # Training history
         history = {
-            'train_loss': [],
-            'val_loss': [],
+            'train_losses': [],
+            'val_losses': [],
             'train_accuracies': [],
             'val_accuracies': [],
             'hierarchical_acc': []
         }
         
-        for epoch in range(1, epochs + 1):
+        # Start training timer
+        t0 = time.time()
+        info(f"Starting training for {epochs} epochs in {'fast' if fast_mode else 'standard'} mode")
+        
+        # Handle checkpoint loading
+        if self.from_checkpoint:
+            if self.from_checkpoint_path is None:
+                raise ValueError("from_checkpoint_path must be provided when from_checkpoint is True")
+            if not os.path.exists(self.from_checkpoint_path):
+                raise FileNotFoundError(f"Checkpoint file '{self.from_checkpoint_path}' does not exist")
+            start_epoch = self.load_checkpoint(self.from_checkpoint_path) + 1
+            info(f"Loaded model from checkpoint: {self.from_checkpoint_path}")
+        else:
+            start_epoch = 1
+
+        for epoch in range(start_epoch, epochs + 1):
             # Training
             train_loss, train_accuracies = self.train_epoch(train_loader, epoch)
             
@@ -269,8 +305,8 @@ class HierarchicalTrainer:
                 val_loss, val_accuracies, val_metrics, hierarchical_acc = self.evaluate(val_loader, epoch, 'val')
                 
                 # Update history
-                history['train_loss'].append(train_loss)
-                history['val_loss'].append(val_loss)
+                history['train_losses'].append(train_loss)
+                history['val_losses'].append(val_loss)
                 history['train_accuracies'].append(train_accuracies)
                 history['val_accuracies'].append(val_accuracies)
                 history['hierarchical_acc'].append(hierarchical_acc)
@@ -282,28 +318,55 @@ class HierarchicalTrainer:
                     else:
                         self.scheduler.step()
                 
-                # Save best model
-                if save_best:
-                    is_best = False
-                    if hierarchical_acc > best_hierarchical_acc:
-                        best_hierarchical_acc = hierarchical_acc
-                        is_best = True
-                        patience_counter = 0
-                    else:
-                        patience_counter += 1
-                    
-                    if is_best:
-                        self._save_checkpoint(epoch, is_best=True)
+                # Track best model
+                improved = False
+                if hierarchical_acc > best_hierarchical_acc:
+                    best_hierarchical_acc = hierarchical_acc
+                    best_val_loss = val_loss
+                    best_epoch = epoch
+                    best_model_state = self.model.state_dict().copy()
+                    patience_counter = 0
+                    improved = True
+                elif hierarchical_acc == best_hierarchical_acc and val_loss < best_val_loss:
+                    # If hierarchical accuracy is the same, use loss as tie-breaker
+                    best_val_loss = val_loss
+                    best_epoch = epoch
+                    best_model_state = self.model.state_dict().copy()
+                    patience_counter = 0
+                    improved = True
+                else:
+                    patience_counter += 1
+                
+                # Save checkpoint if improved
+                if improved and save_best:
+                    self._save_checkpoint(epoch, is_best=True)
+                
+                # Save regular checkpoint every 5 epochs (similar to single-rank)
+                if epoch % 5 == 0 and save_best:
+                    self._save_checkpoint(epoch)
                 
                 # Early stopping
                 if patience_counter >= patience:
-                    info(f'Early stopping triggered after {epoch} epochs')
+                    info(f'Early stopping triggered after {epoch} epochs. Best epoch was {best_epoch} with hierarchical accuracy {best_hierarchical_acc:.4f}.')
                     break
                 
                 # Test evaluation (if provided)
                 if test_loader is not None and epoch == epochs:
                     test_loss, test_accuracies, test_metrics, test_hierarchical_acc = self.evaluate(test_loader, epoch, 'test')
-                    info(f'Final test results - Loss: {test_loss:.4f}')
+                    info(f'Final test results - Loss: {test_loss:.4f}, Hierarchical Acc: {test_hierarchical_acc:.4f}')
+        
+        # Training completed
+        total_time = time.time() - t0
+        mins, secs = divmod(total_time, 60)
+        hours, mins = divmod(mins, 60)
+        
+        info(f"Training completed in {int(hours)}h {int(mins)}m {int(secs)}s")
+        info(f"Best epoch: {best_epoch} with hierarchical accuracy: {best_hierarchical_acc:.4f}")
+        
+        # Restore best model
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
+            info(f"Restored best model from epoch {best_epoch}")
         
         return history
     
@@ -320,21 +383,23 @@ class HierarchicalTrainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'criterion_state_dict': self.criterion.state_dict(),
-            'model_config': self.model.get_config()
+            'model_name': self.model.name,
         }
         
         if self.scheduler is not None:
             checkpoint['scheduler_state_dict'] = self.scheduler.state_dict()
+            
+        if hasattr(self.model, 'get_config'):
+            checkpoint['model_config'] = self.model.get_config()
+            
+        # Save regular checkpoint (similar to single-rank)
+        filename = f"{self.model.name}_epoch{epoch}.pt"
+        torch.save(checkpoint, os.path.join(self.checkpoint_dir, filename))
         
-        # Save regular checkpoint
-        checkpoint_path = os.path.join(self.checkpoint_dir, f'{self.model.name}_epoch_{epoch}.pt')
-        torch.save(checkpoint, checkpoint_path)
-        
-        # Save best model
+        # Save best model checkpoint (similar to single-rank)
         if is_best:
-            best_path = os.path.join(self.checkpoint_dir, f'{self.model.name}_best.pt')
-            torch.save(checkpoint, best_path)
-            info(f'Best model saved to {best_path}')
+            best_filename = f"{self.model.name}_best.pt"
+            torch.save(checkpoint, os.path.join(self.checkpoint_dir, best_filename))
     
     def load_checkpoint(self, checkpoint_path: str) -> int:
         """

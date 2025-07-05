@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 import torch
 from models.utils.model_factory import create_model
@@ -13,18 +14,12 @@ def main():
     parser.add_argument('--config', type=str, required=True, help='Path to configuration JSON file')
     parser.add_argument('--data_path', type=str, help='Path to the parquet dataset directory (e.g., data/parquets/filtered_ranks). If not provided, will use parquets_path from config or default path.')
     parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
-    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='Directory to save model checkpoints')
-    parser.add_argument('--log_dir', type=str, default='runs', help='Directory for TensorBoard logs')
     args = parser.parse_args()
 
     # Load configuration
     with open(args.config, 'r') as f:
         config = json.load(f)
     info(f"Loaded configuration from {args.config}")
-
-    # Override config with command line arguments
-    config['checkpoint_dir'] = args.checkpoint_dir
-    config['log_dir'] = args.log_dir
 
     # Handle data path similar to single-rank script
     if args.data_path:
@@ -66,6 +61,10 @@ def main():
     input_size = sample_batch['features'].shape[1]
     info(f"Input size: {input_size}")
 
+    # Add experiment identifier to model name (similar to single-rank)
+    exp_id = config.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
+    model_name = f"{config.get('model_type', 'hierarchical')}_{exp_id}"
+
     # Create model
     model = create_model(
         model_type=config['model_type'],
@@ -73,7 +72,8 @@ def main():
         shared_hidden_sizes=config.get('shared_hidden_sizes', [512, 256]),
         level_specific_sizes=config.get('level_specific_sizes'),
         dropout=config.get('dropout', 0.3),
-        use_confidence_weighting=config.get('use_confidence_weighting', True)
+        use_confidence_weighting=config.get('use_confidence_weighting', True),
+        name=model_name
     )
     info(f"Created {model.name} with {sum(p.numel() for p in model.parameters())} parameters")
 
@@ -116,6 +116,12 @@ def main():
             patience=config.get('scheduler_patience', 3)
         )
 
+    # Set up run name and directories (similar to single-rank)
+    encoding_suffix = f"k{config['k']}" if config.get('k') else f"bits{config['bits']}"
+    run_name = f"{model.name}_multirank_{encoding_suffix}"
+    log_dir = os.path.join("runs", run_name)
+    checkpoint_dir = os.path.join("checkpoints", run_name)
+
     # Trainer
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     trainer = HierarchicalTrainer(
@@ -124,8 +130,8 @@ def main():
         optimizer=optimizer,
         device=device,
         scheduler=scheduler,
-        log_dir=config.get('log_dir'),
-        checkpoint_dir=config.get('checkpoint_dir'),
+        log_dir=log_dir,
+        checkpoint_dir=checkpoint_dir,
         class_names_per_level=dataset.labels_names_per_level
     )
 
@@ -142,18 +148,24 @@ def main():
     )
 
     info("Training completed!")
-    info(f"Best validation accuracy: {max(history['val_accuracies']):.4f}")
+    if 'val_accuracies' in history and history['val_accuracies']:
+        info(f"Best validation accuracy: {max(history['val_accuracies']):.4f}")
 
     # Evaluate on test set
     test_loss, test_accuracies, test_metrics, hierarchical_acc = trainer.evaluate(
         test_loader, 
-        epoch=len(history['train_losses']), 
+        epoch=len(history.get('train_losses', [1])), 
         prefix='test'
     )
     info("Test Results:")
     for level, acc in test_accuracies.items():
         info(f"  {level}: {acc:.4f}")
     info(f"  Hierarchical accuracy: {hierarchical_acc:.4f}")
+
+    # Final model info (similar to single-rank)
+    info(f"Model: {model.name}")
+    info(f"TensorBoard logs: {os.path.join('runs', run_name)}")
+    info(f"Model checkpoints: {os.path.join('checkpoints', run_name)}")
 
 if __name__ == "__main__":
     main() 
