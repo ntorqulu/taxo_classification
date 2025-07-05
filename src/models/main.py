@@ -105,6 +105,9 @@ def run_experiment(hparams: dict) -> dict:
     # Load data
     parquets_path = hparams["parquets_path"] if hparams["parquets_path"] else get_base_parquets_path()
     dataset_name = hparams["dataset_name"]
+    min_cardinality_filters = hparams.get("min_cardinality_filters", None)
+    if min_cardinality_filters is not None:
+        info(f"Filtering by cardinality: {min_cardinality_filters}")
 
     taxo_data_loaders = TaxoDataLoaders(
         parquets_path=Path(parquets_path) / dataset_name,
@@ -114,9 +117,11 @@ def run_experiment(hparams: dict) -> dict:
         batch_size=hparams["batch_size"],
         max_rows=hparams["max_rows"],
         seq_len_filter=hparams.get("seq_len_filter", None),
+        min_cardinality_filters=min_cardinality_filters
     )
 
     log_label_stats(taxo_data_loaders)
+    CachedDataFrame.log_level_cardinalities()
 
     # Create model using factory
     model_params: dict[str, Any] = {
