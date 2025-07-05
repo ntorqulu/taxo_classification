@@ -79,35 +79,37 @@ $ PYTHONPATH=$(pwd)/src/ python src/models/main.py --config src/models/hyperpara
 
 Such JSON can have the following keys:
 
-- batch_size: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
-- bits: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
-- dropout: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
-- epochs: int, number of epochs to use in the training phase.
-- eval_frequency: int, How often to run full evaluation (epochs).
-- every_n_epochs: int, When scheduler is done by steps, using the [torch.optim.lr_scheduler.LambdaLR "by_steps"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR), how many epochs has to pass to the LR to be updated.
-- fast_mode: Bool, Use faster evaluation with minimal metrics. This option was meant to optimize the running time for training but there is not much difference.
-- fc_sizes: list, List of fully connected layer sizes for the cnn model.
-- from_checkpoint: Bool, whether the model has to run from a checkpoint, True, or not, False. If True, from_checkpoint_path must not be None. False by default.
-- from_checkpoint_path: Str, the path from where the checkpoint in which the training must continue.
-- hidden_size: list or int, hidden size of the Fully connected layers for the different models. 
-- k: int, size of the window to perform the kmerization. See DNA codification section for further information. If k is not None, then bits must not be specified in the json.
-- kernel_sizes: int, size of the kernel for the cnn model. For the Nanni 2024 models the kernel size is fixed
-- label_column_name: str, name of the column for wich the labels for prediction are taken. Options are: "kingdom_name", "phylum_name", "class_name" and "order_name"
-- learning_rate: float, learning rate used for the optimizer. by default is 0.001 for the Adam and 0.01 for the SGD.
-- max_rows: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
-- model_type: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
-- momentum: float, momentum value for the SDG optimizer.
-- num_filters: int, List of filter counts for conv layers for the "cnn" model
-- optimizer: str, optimizer to be used. Options are "[adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam)" (default) "[sgd](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html)"
-- patience: int, Early stopping patience (epochs with no improvement). Default 5.
-- scheduler: str, lr scheduler if use_scheduler set to True. Options are "[plateau](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau)" (default), "[cosine](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.CosineAnnealingLR.html#torch.optim.lr_scheduler.CosineAnnealingLR)" or "[by_steps](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR)"
-- scheduler_patience: int, patience used by the [ReduceLROnPlateau "plateau"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau) scheduler. Default 3
-- seed: int, seed for reproducibity. Default 42
-- seq_len_filter: int, sequence filter by length. Be aware that the most frequent length for the dataset is 313
-- sequence_length: int, Input sequence length for the Nanni 2024 models. Be aware that the most frequent length for the dataset is 313. 
-- use_batch_norm: Bool, Whether to use or not batch normalization for the enhanced_mlp model
-- use_scheduler: Bool, Whether to use or not the scheduler for the lr
-- weight_decay: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
+- `batch_size`: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
+- `bits`: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
+- `dropout`: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
+- `epochs`: int, number of epochs to use in the training phase.
+- `eval_frequency`: int, How often to run full evaluation (epochs).
+- `every_n_epochs`: int, When scheduler is done by steps, using the [torch.optim.lr_scheduler.LambdaLR "by_steps"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR), how many epochs has to pass to the LR to be updated.
+- `fast_mode`: Bool, Use faster evaluation with minimal metrics. This option was meant to optimize the running time for training but there is not much difference.
+- `fc_sizes`: list, List of fully connected layer sizes for the cnn model.
+- `from_checkpoint`: Bool, whether the model has to run from a checkpoint, True, or not, False. If True, from_checkpoint_path must not be None. False by default.
+- `from_checkpoint_path`: Str, the path from where the checkpoint in which the training must continue.
+- `hidden_size`: list or int, hidden size of the Fully connected layers for the different models. 
+- `k`: int, size of the window to perform the kmerization. See DNA codification section for further information. If k is not None, then bits must not be specified in the json.
+- `kernel_sizes`: int, size of the kernel for the cnn model. For the Nanni 2024 models the kernel size is fixed
+- `label_column_name`: str, name of the column for wich the labels for prediction are taken. Options are: "kingdom_name", "phylum_name", "class_name" and "order_name"
+- `learning_rate`: float, learning rate used for the optimizer. by default is 0.001 for the Adam and 0.01 for the SGD.
+- `max_rows`: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
+- `min_cardinality_filters`: dict[str, int], dictionary with rank columns as keys and *minimum* cardinality as values.
+Only labels in each column with cardinality higher than the specified value will be used.
+- `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
+- `momentum`: float, momentum value for the SDG optimizer.
+- `num_filters`: int, List of filter counts for conv layers for the "cnn" model
+- `optimizer`: str, optimizer to be used. Options are "[adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam)" (default) "[sgd](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html)"
+- `patience`: int, Early stopping patience (epochs with no improvement). Default 5.
+- `scheduler`: str, lr scheduler if use_scheduler set to True. Options are "[plateau](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau)" (default), "[cosine](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.CosineAnnealingLR.html#torch.optim.lr_scheduler.CosineAnnealingLR)" or "[by_steps](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR)"
+- `scheduler_patience`: int, patience used by the [ReduceLROnPlateau "plateau"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau) scheduler. Default 3
+- `seed`: int, seed for reproducibity. Default 42
+- `seq_len_filter`: int, sequence filter by length. Be aware that the most frequent length for the dataset is 313
+- `sequence_length`: int, Input sequence length for the Nanni 2024 models. Be aware that the most frequent length for the dataset is 313. 
+- `use_batch_norm`: Bool, Whether to use or not batch normalization for the enhanced_mlp model
+- `use_scheduler`: Bool, Whether to use or not the scheduler for the lr
+- `weight_decay`: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
 
 
 # Preguntes a resoldre:
