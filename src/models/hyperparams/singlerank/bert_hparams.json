@@ -20,7 +20,7 @@
   "scheduler_factor": 0.5,
   "patience": 5,
   
-  "vocab_size": 5,
+  "vocab_size": 4,
   "max_length": 313,
   "hidden_size": 128,
   "num_layers": 3,

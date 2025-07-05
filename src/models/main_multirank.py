@@ -6,12 +6,13 @@ import torch
 from models.utils.model_factory import create_model
 from models.training.multirank_trainer import HierarchicalTrainer
 from dataset.hierarchical_dataset import HierarchicalDataset
-from dataset.utils import info
+from dataset.utils import info, get_base_parquets_path, DEFAULT_DATASET_NAME
 
 def main():
     parser = argparse.ArgumentParser(description='Multi-Rank Taxonomy Classification')
     parser.add_argument('--config', type=str, required=True, help='Path to configuration JSON file')
-    parser.add_argument('--data_path', type=str, required=True, help='Path to the parquet dataset directory (e.g., data/parquets/filtered_ranks)')
+    parser.add_argument('--data_path', type=str, help='Path to the parquet dataset directory (e.g., data/parquets/filtered_ranks). If not provided, will use parquets_path from config or default path.')
+    parser.add_argument('--dataset_name', type=str, default=DEFAULT_DATASET_NAME, help='Directory containing dataset files. Defaults to filtered_ranks')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='Directory to save model checkpoints')
     parser.add_argument('--log_dir', type=str, default='runs', help='Directory for TensorBoard logs')
     args = parser.parse_args()
@@ -25,12 +26,25 @@ def main():
     config['checkpoint_dir'] = args.checkpoint_dir
     config['log_dir'] = args.log_dir
 
+    # Handle data path similar to single-rank script
+    if args.data_path:
+        # Use command line argument if provided
+        data_path = Path(args.data_path)
+    elif config.get('parquets_path'):
+        # Use path from config file
+        data_path = Path(config['parquets_path']) / args.dataset_name
+    else:
+        # Use default path
+        data_path = get_base_parquets_path() / args.dataset_name
+    
+    info(f"Using data path: {data_path}")
+
     # Set random seed
     torch.manual_seed(config.get('seed', 123))
 
     # Create data loaders
     dataset = HierarchicalDataset(
-        parquets_path=Path(args.data_path),
+        parquets_path=data_path,
         k=config.get('k'),
         bits=config.get('bits')
     )

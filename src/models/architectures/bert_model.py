@@ -1,37 +1,25 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from typing import Dict, Any, Optional, Union
+import math
+from typing import Dict, Any, Optional
 from models.architectures.base_model import BaseModel
 
+# ONLY IMPLEMENT FOR 4-ROW ENCODING
 
 class BERTTaxoModel(BaseModel):
-    """BERT-based model for taxonomy classification that handles multiple encoding types."""
+    """BERT-based model for taxonomy classification using 4-row encoding."""
     
     def __init__(self, 
-                 vocab_size: int = 5,  # A, T, G, C, N
+                 vocab_size: int = 4,  # A, T, G, C
                  max_length: int = 512,
-                 hidden_size: int = 128,  # Reduced for better training
-                 num_layers: int = 3,     # Reduced for better training
-                 num_heads: int = 4,      # Reduced for better training
-                 dropout: float = 0.2,    # Reduced for better training
+                 hidden_size: int = 128,
+                 num_layers: int = 3,
+                 num_heads: int = 4,
+                 dropout: float = 0.2,
                  output_size: Optional[int] = None,
-                 classifier_hidden_size: int = 128,  # Reduced for better training
+                 classifier_hidden_size: int = 128,
                  name: str = "BERTTaxoModel"):
-        """
-        Initialize the BERT-based taxonomy model.
-        
-        Args:
-            vocab_size: Size of vocabulary (5 for DNA: A, T, G, C, N)
-            max_length: Maximum sequence length
-            hidden_size: Hidden dimension size
-            num_layers: Number of transformer layers
-            num_heads: Number of attention heads
-            dropout: Dropout rate
-            output_size: Number of classes for classification
-            classifier_hidden_size: Size of hidden layer in classifier
-            name: Model name
-        """
+        """Initialize the BERT-based taxonomy model."""
         super().__init__(name=name)
         self.vocab_size = vocab_size
         self.max_length = max_length
@@ -43,24 +31,34 @@ class BERTTaxoModel(BaseModel):
         self.classifier_hidden_size = classifier_hidden_size
         
         # Character to ID mapping for DNA
-        self.char_to_id = {'A': 0, 'T': 1, 'G': 2, 'C': 3, 'N': 4}
-        self.id_to_char = {0: 'A', 1: 'T', 2: 'G', 3: 'C', 4: 'N'}
+        self.char_to_id = {'A': 0, 'T': 1, 'G': 2, 'C': 3}
+        self.id_to_char = {0: 'A', 1: 'T', 2: 'G', 3: 'C'}
         
         # Embedding layer
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         
-        # Positional encoding
-        self.pos_encoding = nn.Parameter(torch.randn(1, max_length, hidden_size))
+        # Fixed positional encodings
+        position = torch.arange(0, max_length).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, hidden_size, 2).float() * -(math.log(10000.0) / hidden_size))
+        pe = torch.zeros(1, max_length, hidden_size)
+        pe[:, :, 0::2] = torch.sin(position * div_term)
+        pe[:, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pos_encoding', pe)
         
-        # Transformer encoder layers
+        # Layer normalization
+        self.embed_norm = nn.LayerNorm(hidden_size)
+        self.final_norm = nn.LayerNorm(hidden_size)
+        
+        # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=hidden_size,
             nhead=num_heads,
             dim_feedforward=hidden_size * 4,
             dropout=dropout,
-            batch_first=True
+            batch_first=True,
+            norm_first=True
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers, enable_nested_tensor=False)
         
         # Classification head
         self.classifier = nn.Sequential(
@@ -75,87 +73,31 @@ class BERTTaxoModel(BaseModel):
         
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
-        
-        # Flag to track which encoding type we're using
-        self.encoding_type = None
-        
-    def _tokenize_sequence(self, sequence: str) -> torch.Tensor:
-        """Convert DNA sequence to token IDs."""
-        tokens = []
-        for char in sequence:
-            if char in self.char_to_id:
-                tokens.append(self.char_to_id[char])
-            else:
-                tokens.append(self.char_to_id['N'])  # Unknown character
-        return torch.tensor(tokens, dtype=torch.long)
-    
-    def _tokenize_batch(self, sequences: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
-        """Tokenize a batch of sequences."""
-        batch_tokens = []
-        batch_masks = []
-        
-        for sequence in sequences:
-            # Tokenize sequence
-            tokens = self._tokenize_sequence(sequence)
-            
-            # Pad or truncate to max_length
-            if len(tokens) > self.max_length:
-                tokens = tokens[:self.max_length]
-                mask = torch.ones(self.max_length, dtype=torch.bool)
-            else:
-                # Pad with N token (ID 4)
-                padding_length = self.max_length - len(tokens)
-                tokens = torch.cat([tokens, torch.full((padding_length,), 4, dtype=torch.long)])
-                mask = torch.cat([torch.ones(len(tokens) - padding_length, dtype=torch.bool),
-                                torch.zeros(padding_length, dtype=torch.bool)])
-            
-            batch_tokens.append(tokens)
-            batch_masks.append(mask)
-        
-        return torch.stack(batch_tokens), torch.stack(batch_masks)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass through the BERT model.
-        
-        Args:
-            x: Input tensor - can be:
-               - 4-row encoding: [batch_size, 4, sequence_length] or [batch_size, 1, 4, sequence_length]
-               - One-hot encoding: [batch_size, 4, sequence_length] or [batch_size, 1, 4, sequence_length]
-               - K-mer encoding: [batch_size, features]
-        Returns:
-            Classification logits
-        """
+        """Forward pass through the BERT model."""
+        if x is None or x.nelement() == 0:
+            raise ValueError("Empty input tensor provided")
+            
         # Handle extra dimension if present
         if x.dim() == 4 and x.shape[1] == 1:
-            # Input shape: [batch_size, 1, 4, sequence_length] -> squeeze to [batch_size, 4, sequence_length]
             x = x.squeeze(1)
         
-        # Determine encoding type based on input shape
-        if x.dim() == 3 and x.shape[1] == 4:
-            # 4-row or one-hot encoding: [batch_size, 4, sequence_length]
-            self.encoding_type = "4row_or_onehot"
-            return self._forward_4row_or_onehot(x)
-        elif x.dim() == 2:
-            # K-mer encoding: [batch_size, features]
-            self.encoding_type = "kmer"
-            return self._forward_kmer(x)
-        else:
-            raise ValueError(f"Unsupported input format: {x.shape}")
+        # Validate input format
+        if x.dim() != 3 or x.shape[1] != 4:
+            raise ValueError(f"Expected 4-row encoding with shape [batch_size, 4, seq_len], got: {x.shape}")
+        
+        return self._forward_4row(x)
     
-    def _forward_4row_or_onehot(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass for 4-row or one-hot encoding."""
-        # Input shape: [batch_size, 4, sequence_length]
+    def _forward_4row(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass for 4-row encoding."""
         batch_size, num_channels, seq_len = x.shape
         
-        # Convert to character sequences
-        sequences = self._convert_4row_to_sequences(x)
+        # Convert 4-row matrix directly to token IDs using argmax
+        input_ids = torch.argmax(x, dim=1)  # [batch_size, seq_len]
         
-        # Tokenize sequences
-        input_ids, attention_mask = self._tokenize_batch(sequences)
-        device = next(self.parameters()).device
-        input_ids = input_ids.to(device)
-        attention_mask = attention_mask.to(device)
+        # Create attention mask (assuming all positions are valid)
+        attention_mask = torch.ones((batch_size, seq_len), dtype=torch.bool, device=x.device)
         
         # Truncate if sequence is too long
         if seq_len > self.max_length:
@@ -170,65 +112,32 @@ class BERTTaxoModel(BaseModel):
         pos_enc = self.pos_encoding[:, :seq_len, :]
         embeddings = embeddings + pos_enc
         
+        # Apply layer normalization
+        embeddings = self.embed_norm(embeddings)
+        
         # Apply dropout
         embeddings = self.dropout_layer(embeddings)
         
         # Create padding mask for transformer
         padding_mask = ~attention_mask  # Invert attention mask
         
-        # Pass through transformer
-        transformer_output = self.transformer(embeddings, src_key_padding_mask=padding_mask)
-        
-        # Global average pooling (mean over sequence length)
-        masked_output = transformer_output * attention_mask.unsqueeze(-1)
-        features = masked_output.sum(dim=1) / attention_mask.sum(dim=1, keepdim=True)
-        
-        # Classification
-        logits = self.classifier(features)
-        return logits
-    
-    def _forward_kmer(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass for k-mer encoding."""
-        # Input shape: [batch_size, features]
-        # For k-mer encoding, we'll use a simple MLP approach
-        
-        # Create MLP classifier if it doesn't exist
-        if not hasattr(self, 'kmer_classifier'):
-            input_size = x.shape[1]
-            self.kmer_classifier = nn.Sequential(
-                nn.Linear(input_size, self.hidden_size),
-                nn.ReLU(),
-                nn.Dropout(self.dropout),
-                nn.Linear(self.hidden_size, self.hidden_size // 2),
-                nn.ReLU(),
-                nn.Dropout(self.dropout),
-                nn.Linear(self.hidden_size // 2, self.output_size) if self.output_size else nn.Identity()
-            ).to(x.device)
-        
-        return self.kmer_classifier(x)
-    
-    def _convert_4row_to_sequences(self, matrix: torch.Tensor) -> list[str]:
-        """Convert 4-row matrix encoding to DNA sequences."""
-        # Matrix shape: [batch_size, 4, sequence_length]
-        # Each position has 4 values representing A, T, G, C
-        batch_size, _, seq_len = matrix.shape
-        sequences = []
-        
-        for i in range(batch_size):
-            sequence = ""
-            for j in range(seq_len):
-                # Get the nucleotide probabilities for this position
-                probs = matrix[i, :, j]  # [4] - probabilities for A, T, G, C
-                
-                # Find the most likely nucleotide
-                nucleotide_idx = int(torch.argmax(probs).item())
-                nucleotides = ['A', 'T', 'G', 'C']
-                nucleotide = nucleotides[nucleotide_idx]
-                sequence += nucleotide
+        try:
+            # Pass through transformer
+            transformer_output = self.transformer(embeddings, src_key_padding_mask=padding_mask)
             
-            sequences.append(sequence)
-        
-        return sequences
+            # Apply final layer normalization
+            transformer_output = self.final_norm(transformer_output)
+            
+            # Global average pooling (mean over sequence length)
+            masked_output = transformer_output * attention_mask.unsqueeze(-1)
+            features = masked_output.sum(dim=1) / attention_mask.sum(dim=1, keepdim=True).clamp(min=1)
+            
+            # Classification
+            logits = self.classifier(features)
+            return logits
+            
+        except Exception as e:
+            raise RuntimeError(f"Error in transformer processing: {str(e)}. Input shape: {x.shape}") from e
     
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
@@ -246,20 +155,36 @@ class BERTTaxoModel(BaseModel):
     
     @classmethod
     def load(cls, path: str, map_location: Optional[str] = None) -> 'BERTTaxoModel':
-        checkpoint = torch.load(path, map_location=map_location)
-        config = checkpoint['model_config']
-        
-        model = cls(
-            vocab_size=config['vocab_size'],
-            max_length=config['max_length'],
-            hidden_size=config['hidden_size'],
-            num_layers=config['num_layers'],
-            num_heads=config['num_heads'],
-            dropout=config['dropout'],
-            output_size=config['output_size'],
-            classifier_hidden_size=config['classifier_hidden_size'],
-            name=config.get('name', 'BERTTaxoModel')
-        )
-        
-        model.load_state_dict(checkpoint['model_state_dict'])
-        return model 
+        try:
+            checkpoint = torch.load(path, map_location=map_location)
+            config = checkpoint['model_config']
+            
+            required_keys = ['vocab_size', 'max_length', 'hidden_size', 
+                            'num_layers', 'num_heads', 'dropout']
+            for key in required_keys:
+                if key not in config:
+                    raise ValueError(f"Missing required configuration key: {key}")
+            
+            model = cls(
+                vocab_size=config['vocab_size'],
+                max_length=config['max_length'],
+                hidden_size=config['hidden_size'],
+                num_layers=config['num_layers'],
+                num_heads=config['num_heads'],
+                dropout=config['dropout'],
+                output_size=config.get('output_size'),
+                classifier_hidden_size=config.get('classifier_hidden_size', 128),
+                name=config.get('name', 'BERTTaxoModel')
+            )
+            
+            # Load the state dict, ignoring kmer_classifier related keys
+            state_dict = checkpoint['model_state_dict']
+            # Filter out kmer_classifier keys if present
+            filtered_state_dict = {k: v for k, v in state_dict.items() 
+                                 if not k.startswith('kmer_classifier')}
+            
+            model.load_state_dict(filtered_state_dict, strict=False)
+            return model
+            
+        except Exception as e:
+            raise RuntimeError(f"Error loading model from {path}: {str(e)}") from e
