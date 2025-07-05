@@ -121,6 +121,7 @@ def run_experiment(hparams: dict) -> dict:
     )
 
     log_label_stats(taxo_data_loaders)
+    info("Level cardinalities:")
     CachedDataFrame.log_level_cardinalities()
 
     # Create model using factory
