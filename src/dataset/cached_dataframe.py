@@ -95,7 +95,8 @@ class CachedDataFrame:
     @classmethod
     def get_level_column_names(cls) -> list[str]:
         assert CachedDataFrame._df is not None
-        lcn = [c for c in CachedDataFrame._df.columns if c.endswith(CachedDataFrame.LEVEL_COLUMN_NAME_SUFIX)]
+        lcn = [c for c in CachedDataFrame._df.columns
+               if c.endswith(CachedDataFrame.LEVEL_COLUMN_NAME_SUFIX) and c != "scientific_name"]
         return lcn
 
     @classmethod
@@ -123,6 +124,4 @@ class CachedDataFrame:
     @classmethod
     def log_level_cardinalities(cls):
         for column_name in cls.get_level_column_names():
-            if column_name == "scientific_name":
-                continue
             info(f"{column_name}: { cls.get_column_cardinality(column_name)}")
