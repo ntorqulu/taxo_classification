@@ -69,46 +69,184 @@ cd taxo_classification
 python -m src.preprocessing.filter
 ```
 
-### Testing the architechtures
-#### Hyperparams JSON
-To parse the different hyperparameters and the different options for each experiment a json can be used. When running the model you can parse the json with the option --config
+### Testing the architectures
 
+The project supports two main types of models:
+
+#### Single-Rank Models
+These models predict a single taxonomic level (e.g., only order_name or only phylum_name).
+
+**Available Model Types:**
+- `basic`: Simple MLP model
+- `enhanced_mlp`: Enhanced MLP with configurable layers and batch normalization
+- `cnn`: CNN model for sequence-based classification
+- `nanni_cnn1`: CNN model from Nanni et al. 2024 (version 1)
+- `nanni_cnn2`: CNN model from Nanni et al. 2024 (version 2)
+- `nanni_att`: Attention-based model from Nanni et al. 2024
+- `nanni_att_kmer`: Attention-based model for k-mer encoded data
+- `bert`: BERT-based model for taxonomy classification
+
+**Running Single-Rank Models:**
+```bash
+cd taxo_classification
+python run_singlerank_experiment.py --config src/models/hyperparams/singlerank/nanni_cnn1_hparams.json
 ```
-$ PYTHONPATH=$(pwd)/src/ python src/models/main.py --config src/models/hyperparams/kmer_hparams.json --model_type basic
+
+#### Multi-Rank Models
+These models predict multiple taxonomic levels simultaneously, leveraging hierarchical relationships.
+
+**Available Model Types:**
+- `hierarchical`: Hierarchical model with shared feature extractor and multiple output heads
+- `cascade_hierarchical`: Cascade model where predictions flow from higher to lower levels
+- `gnn_hierarchical`: Graph Neural Network model for hierarchical taxonomy classification
+
+**Running Multi-Rank Models:**
+```bash
+cd taxo_classification
+python run_multirank_experiment.py --config src/models/hyperparams/multirank/hierarchical_genus_hparams.json
 ```
 
-Such JSON can have the following keys:
+#### Hyperparameters JSON Configuration
 
-- batch_size: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
-- bits: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
-- dropout: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
-- epochs: int, number of epochs to use in the training phase.
-- eval_frequency: int, How often to run full evaluation (epochs).
-- every_n_epochs: int, When scheduler is done by steps, using the [torch.optim.lr_scheduler.LambdaLR "by_steps"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR), how many epochs has to pass to the LR to be updated.
-- fast_mode: Bool, Use faster evaluation with minimal metrics. This option was meant to optimize the running time for training but there is not much difference.
-- fc_sizes: list, List of fully connected layer sizes for the cnn model.
-- from_checkpoint: Bool, whether the model has to run from a checkpoint, True, or not, False. If True, from_checkpoint_path must not be None. False by default.
-- from_checkpoint_path: Str, the path from where the checkpoint in which the training must continue.
-- hidden_size: list or int, hidden size of the Fully connected layers for the different models. 
-- k: int, size of the window to perform the kmerization. See DNA codification section for further information. If k is not None, then bits must not be specified in the json.
-- kernel_sizes: int, size of the kernel for the cnn model. For the Nanni 2024 models the kernel size is fixed
-- label_column_name: str, name of the column for wich the labels for prediction are taken. Options are: "kingdom_name", "phylum_name", "class_name" and "order_name"
-- learning_rate: float, learning rate used for the optimizer. by default is 0.001 for the Adam and 0.01 for the SGD.
-- max_rows: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
-- model_type: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
-- momentum: float, momentum value for the SDG optimizer.
-- num_filters: int, List of filter counts for conv layers for the "cnn" model
-- optimizer: str, optimizer to be used. Options are "[adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam)" (default) "[sgd](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html)"
-- patience: int, Early stopping patience (epochs with no improvement). Default 5.
-- scheduler: str, lr scheduler if use_scheduler set to True. Options are "[plateau](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau)" (default), "[cosine](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.CosineAnnealingLR.html#torch.optim.lr_scheduler.CosineAnnealingLR)" or "[by_steps](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LambdaLR.html#torch.optim.lr_scheduler.LambdaLR)"
-- scheduler_patience: int, patience used by the [ReduceLROnPlateau "plateau"](https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html#reducelronplateau) scheduler. Default 3
-- seed: int, seed for reproducibity. Default 42
-- seq_len_filter: int, sequence filter by length. Be aware that the most frequent length for the dataset is 313
-- sequence_length: int, Input sequence length for the Nanni 2024 models. Be aware that the most frequent length for the dataset is 313. 
-- use_batch_norm: Bool, Whether to use or not batch normalization for the enhanced_mlp model
-- use_scheduler: Bool, Whether to use or not the scheduler for the lr
-- weight_decay: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
+Both single-rank and multi-rank models use JSON configuration files to specify hyperparameters. The configuration files are located in:
+- Single-rank: `src/models/hyperparams/singlerank/`
+- Multi-rank: `src/models/hyperparams/multirank/`
 
+**Common Hyperparameters (Single-Rank and Multi-Rank):**
+
+- `batch_size`: int, size of the batch for the training process
+- `epochs`: int, number of epochs to use in the training phase
+- `learning_rate`: float, learning rate used for the optimizer (default: 0.001 for Adam, 0.01 for SGD)
+- `seed`: int, seed for reproducibility (default: 42)
+- `dataset_name`: str, name of the dataset to use ("filtered_ranks" or "all_ranks")
+- `label_column_name`: str, target taxonomic level for single-rank models or highest level for multi-rank models
+- `max_rows`: float or int, proportion or total number of sequences to use
+- `patience`: int, early stopping patience (epochs with no improvement, default: 5)
+- `fast_mode`: bool, use faster evaluation with minimal metrics
+- `eval_frequency`: int, how often to run full evaluation (epochs)
+
+**Single-Rank Specific Hyperparameters:**
+
+- `model_type`: str, model architecture type
+- `k`: int, size of the window for k-merization (if specified, bits must be null)
+- `bits`: int, number of bits for one-hot encoding (if specified, k must be null)
+- `hidden_size`: int, hidden layer size for basic and enhanced_mlp models
+- `sequence_length`: int, input sequence length for Nanni models (default: 313)
+- `dropout`: float, dropout probability
+- `use_batch_norm`: bool, whether to use batch normalization
+- `optimizer`: str, optimizer type ("adam" or "sgd")
+- `use_scheduler`: bool, whether to use learning rate scheduler
+- `scheduler`: str, scheduler type ("plateau", "cosine", or "by_step")
+- `weight_decay`: float, weight decay for optimizers
+
+**Multi-Rank Specific Hyperparameters:**
+
+- `model_type`: str, multi-rank model architecture type
+- `shared_hidden_sizes`: list[int], hidden layer sizes for shared feature extractor
+- `level_specific_sizes`: dict, mapping of taxonomic levels to specific hidden layer sizes
+- `level_weights`: dict, weights for different taxonomic levels in loss calculation
+- `dropout`: float, dropout probability
+- `use_confidence_weighting`: bool, whether to use confidence weighting (cascade models)
+- `cascade_weight`: float, weight for cascade consistency loss
+- `confidence_weight`: float, weight for confidence regularization
+- `gnn_layers`: int, number of GNN layers (GNN models)
+- `use_attention`: bool, whether to use attention mechanism (GNN models)
+- `graph_weight`: float, weight for graph structure regularization (GNN models)
+- `consistency_weight`: float, weight for hierarchical consistency (GNN models)
+
+**Example Configuration Files:**
+
+Single-rank example (`nanni_cnn1_hparams.json`):
+```json
+{
+    "parquets_path": "",
+    "dataset_name": "filtered_ranks",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 15,
+    "batch_size": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 0,
+    "label_column_name": "order_name",
+    "k": null,
+    "bits": 0,
+    "hidden_size": 8,
+    "model_type": "nanni_cnn1",
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "by_step",
+    "every_n_epochs": 50,
+    "seq_len_filter": 313,
+    "dropout": 0.5,
+    "use_batch_norm": true,
+    "fast_mode": true,
+    "eval_frequency": 5
+}
+```
+
+Multi-rank example (`hierarchical_genus_hparams.json`):
+```json
+{
+    "parquets_path": "",
+    "dataset_name": "all_ranks",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 50,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-5,
+    "label_column_name": "genus_name",
+    "k": null,
+    "bits": 4,
+    "model_type": "hierarchical",
+    "shared_hidden_sizes": [512, 256],
+    "level_specific_sizes": {
+        "kingdom_name": [128, 64],
+        "phylum_name": [128, 64],
+        "class_name": [128, 64],
+        "order_name": [128, 64],
+        "family_name": [128, 64],
+        "genus_name": [128, 64]
+    },
+    "level_weights": {
+        "kingdom_name": 1.0,
+        "phylum_name": 1.0,
+        "class_name": 1.0,
+        "order_name": 1.0,
+        "family_name": 1.0,
+        "genus_name": 1.0
+    },
+    "dropout": 0.3,
+    "patience": 10,
+    "fast_mode": false,
+    "eval_frequency": 1
+}
+```
+
+**Available Configuration Files:**
+
+Single-rank configurations:
+- `basic_hparams.json` - Basic MLP model
+- `enhanced_mlp_hparams.json` - Enhanced MLP with batch normalization
+- `cnn_hparams.json` - CNN model
+- `nanni_cnn1_hparams.json` - Nanni CNN1 model
+- `nanni_cnn2_hparams.json` - Nanni CNN2 model
+- `nanni_att_hparams.json` - Nanni attention model
+- `nanni_att_2mer_hparams.json` - Nanni attention model for 2-mer encoding
+- `bert_hparams.json` - BERT model
+- `kmer_hparams.json` - K-mer encoding configuration
+- `one_hot_hparams.json` - One-hot encoding configuration
+
+Multi-rank configurations:
+- `hierarchical_hparams.json` - Basic hierarchical model
+- `hierarchical_genus_hparams.json` - Hierarchical model up to genus level
+- `hierarchical_species_hparams.json` - Hierarchical model up to species level
+- `cascade_hparams.json` - Cascade hierarchical model
+- `cascade_genus_hparams.json` - Cascade model up to genus level
+- `cascade_species_hparams.json` - Cascade model up to species level
+- `gnn_hierarchical_hparams.json` - GNN hierarchical model
+- `gnn_genus_hparams.json` - GNN model up to genus level
+- `gnn_species_hparams.json` - GNN model up to species level
 
 # Preguntes a resoldre:
 ## Donat que tenim un problema de balanceig, podem solucionar-ho amb data augmentation? comparem diferents mètodes amb no augmentar les dades.
