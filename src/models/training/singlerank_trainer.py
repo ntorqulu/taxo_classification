@@ -256,7 +256,10 @@ class Trainer:
         
         # Get number of classes
         batch = next(iter(data_loader))
-        output = self.model(batch[0][:1].to(self.device))
+        sample_data = batch[0][:1].to(self.device)
+        if sample_data.dim() == 3:  # [1, 4, seq_len]
+            sample_data = sample_data.unsqueeze(1)  # [1, 1, 4, seq_len]
+        output = self.model(sample_data)
         num_classes = output.size(1)
         
         # Calculate metrics
