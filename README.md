@@ -112,6 +112,10 @@ Only labels in each column with cardinality higher than the specified value will
 - `weight_decay`: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
 
 
+# Results
+
+Checkout the Results folder.
+
 # Preguntes a resoldre:
 ## Donat que tenim un problema de balanceig, podem solucionar-ho amb data augmentation? comparem diferents mètodes amb no augmentar les dades.
 
