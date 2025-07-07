@@ -163,8 +163,9 @@ class TaxoDataset(Dataset):
             mask &= self._df[CachedDataFrame.SEQUENCE_COLUMN_NAME].str.len() == self.seq_len_filter
 
         # Update the mask applying the filter_min_cardinalities
+        # mask_fixed = mask.copy()  # Use this if you don't want to update the mask in place
         for column_name, min_cardinality in self.min_cardinality_filters.items():
-            cardinalities = self._df[column_name].value_counts()
+            cardinalities = self._df[mask][column_name].value_counts()
             mask &= self._df[column_name].map(cardinalities).astype(int) >= min_cardinality
 
         # Return a list with the indexes after applying the filters

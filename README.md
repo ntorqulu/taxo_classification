@@ -96,7 +96,7 @@ Such JSON can have the following keys:
 - `learning_rate`: float, learning rate used for the optimizer. by default is 0.001 for the Adam and 0.01 for the SGD.
 - `max_rows`: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
 - `min_cardinality_filters`: dict[str, int], dictionary with rank columns as keys and *minimum* cardinality as values.
-Only labels in each column with cardinality higher than the specified value will be used.
+Only labels in each column with cardinality higher than the specified value will be used. In case of multiple labels, the order of the labels will be taken into account.
 - `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
 - `momentum`: float, momentum value for the SDG optimizer.
 - `num_filters`: int, List of filter counts for conv layers for the "cnn" model
