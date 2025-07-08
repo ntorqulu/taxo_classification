@@ -158,19 +158,50 @@ Three main approaches are implemented:
 
 Supported architectures:
 
+### 5.1 Fully Connected Neural Network (MLP)
 - **Fully Connected Neural Network (MLP):**  
-  [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py), [`basic_model.py`](src/models/architectures/basic_model.py)
-- **Convolutional Neural Network (CNN):**  
-  [`cnn_model.py`](src/models/architectures/cnn_model.py)
-- **Nanni CNN Variants:**  
-  [`nanni2024.py`](src/models/architectures/nanni2024.py)  
-  Includes Nanni CNN1, Nanni CNN2, and attention-based models.
-- **BERT-based Model:**  
-  [`bert_model.py`](src/models/architectures/bert_model.py)
-- **Hierarchical/Cascade Models:**  
-  [`hierarchical_model.py`](src/models/architectures/hierarchical_model.py), [`cascade_hierarchical_model.py`](src/models/architectures/cascade_hierarchical_model.py)
-- **Graph Neural Network (GNN):**  
-  [`gnn_hierarchical_model.py`](src/models/architectures/gnn_hierarchical_model.py)
+- **Files:** [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py), [`basic_model.py`](src/models/architectures/basic_model.py)
+- **Description:** Standard multi-layer perceptron for classification. Used as a baseline and for simple tasks.
+- **Features:** Configurable hidden layers, dropout, batch normalization (in enhanced MLP).
+- **Usage:** Suitable for one-hot/bit encoded or k-merized data.
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
+  
+### 5.2 Convolutional Neural Network (CNN)
+- **File:** [`cnn_model.py`](src/models/architectures/cnn_model.py)
+- **Description:** Standard CNN for extracting local sequence patterns. 
+- **Features:** Multiple convolutional layers, configurable kernel sizes and filter counts, followed by fully connected layers.
+- **Usage:** Best for 4×N matrix or one-hot encoded data.
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
+  
+### 5.3 Nanni CNN Variants
+- **File:** [`nanni2024.py`](src/models/architectures/nanni2024.py)
+- **Description:** Advanced CNNs inspired by Nanni et al. (2020, 2024), designed for DNA sequence classification.
+- **Variants:**
+  - **Nanni CNN1:** Compact CNN for efficient modeling.
+  - **Nanni CNN2:** Deeper CNN with more filters and layers.
+  - **Nanni Attention Models:** CNNs with attention mechanisms for interpretability and accuracy.
+- **Features:** Fixed kernel sizes, dropout, and attention layers (for attention models).
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
+
+### 5.4 BERT-based Model
+- **File:** [`bert_model.py`](src/models/architectures/bert_model.py)
+- **Description:** Transformer-based model for sequence modeling, inspired by BERT.
+- **Features:** Multi-head self-attention, positional encoding, deep transformer layers.
+- **Usage:** Suitable for long-range dependencies in DNA sequences.
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
+
+- **Files:** [`hierarchical_model.py`](src/models/architectures/hierarchical_model.py), [`cascade_hierarchical_model.py`](src/models/architectures/cascade_hierarchical_model.py)
+- **Description:** Models for multi-rank (hierarchical) classification, predicting multiple taxonomic levels simultaneously.
+- **Features:** Shared and level-specific layers, cascade loss, confidence weighting.
+- **Usage:** Used for hierarchical datasets (all_ranks or filtered_ranks).
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
+
+### 6.6 Graph Neural Network (GNN)
+- **File:** [`gnn_hierarchical_model.py`](src/models/architectures/gnn_hierarchical_model.py)
+- **Description:** GNN for modeling relationships between taxonomic levels.
+- **Features:** Multiple GNN layers, optional attention, graph and consistency loss.
+- **Usage:** For advanced hierarchical classification tasks.
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
 
 **Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
@@ -368,19 +399,20 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 
 ---
 ## 8. Results
-
+TODO
 Checkout the Results folder.
 
 ---
 
 ## xx. License
 
-[MIT License](LICENSE)
+This project is licensed under the terms of the [MIT License](LICENSE).
 
 ---
 
 ## xx. References
 
+TODO: Add more references
 - Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
 - [mkCOInr](https://github.com/meglecz/mkCOInr)
 - [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3)
