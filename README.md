@@ -22,7 +22,88 @@ TODO
 
 ---
 ## 1. Project Structure
-
+TODO
+taxo_classification/
+├── README.md
+├── Dockerfile
+├── run_singlerank_experiment.py
+├── run_multirank_experiment.py
+├── parquets/
+│   ├── filtered_ranks/
+│   │   ├── dataset_4rowmatrix.parquet
+│   │   ├── dataset_bits_1.parquet
+│   │   ├── dataset_bits_2.parquet
+│   │   ├── dataset_bits_4.parquet
+│   │   ├── dataset_kmer_1.parquet
+│   │   ├── dataset_kmer_2.parquet
+│   │   ├── dataset_kmer_3.parquet
+│   │   ├── dataset_kmer_4.parquet
+│   │   └── dataset_kmer_5.parquet
+│   └── all_ranks/
+│       ├── dataset_4rowmatrix.parquet
+│       ├── dataset_bits_1.parquet
+│       ├── dataset_bits_2.parquet
+│       ├── dataset_bits_4.parquet
+│       ├── dataset_kmer_1.parquet
+│       ├── dataset_kmer_2.parquet
+│       ├── dataset_kmer_3.parquet
+│       ├── dataset_kmer_4.parquet
+│       └── dataset_kmer_5.parquet
+├── src/
+│   ├── constants/
+│   │   └── taxonomy_labels.py
+│   ├── dataset/
+│   │   ├── __init__.py
+│   │   ├── cached_dataframe.py
+│   │   ├── hierarchical_dataset.py
+│   │   ├── taxo_dataloaders.py
+│   │   └── utils.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── main_singlerank.py
+│   │   ├── main_multirank.py
+│   │   ├── architectures/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_model.py
+│   │   │   ├── bert_model.py
+│   │   │   ├── cnn_model.py
+│   │   │   ├── mlp_model.py
+│   │   │   ├── enhanced_mlp.py
+│   │   │   ├── nanni2024.py
+│   │   │   ├── hierarchical_model.py
+│   │   │   ├── cascade_hierarchical_model.py
+│   │   │   └── gnn_hierarchical_model.py
+│   │   ├── training/
+│   │   │   ├── __init__.py
+│   │   │   ├── singlerank_trainer.py
+│   │   │   ├── multirank_trainer.py
+│   │   │   └── sequential_trainer.py
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   └── model_factory.py
+│   │   ├── hyperparams/
+│   │   │   ├── singlerank/
+│   │   │   │   ├── bert_hparams.json
+│   │   │   │   ├── kmer_hparams.json
+│   │   │   │   ├── one_hot_hparams.json
+│   │   │   │   └── nanni_cnn1_hparams.json
+│   │   │   └── multirank/
+│   │   │       ├── hierarchical_hparams.json
+│   │   │       ├── cascade_hparams.json
+│   │   │       └── gnn_hierarchical_hparams.json
+│   └── utils/
+│       ├── __init__.py
+│       └── sequence_formatter.py
+├── notebooks/
+│   ├── data_exploration.ipynb
+│   └── model_evaluation.ipynb
+├── checkpoints/
+│   ├── singlerank/
+│   └── multirank/
+└── runs/
+    ├── singlerank/
+    └── multirank/
+    
 ---
 
 ---
