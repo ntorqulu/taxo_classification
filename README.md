@@ -22,6 +22,7 @@ TODO
 
 ---
 ## 1. Project Structure
+TODO
 ```bash
 taxo_classification/
 ├── README.md
