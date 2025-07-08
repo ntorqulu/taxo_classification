@@ -497,12 +497,6 @@ Checkout the Results folder.
 
 ---
 
-## 8. Results
-TODO
-Checkout the Results folder.
-
----
-
 ## 9. DNA Prediction App
 
 The project includes an application for taxonomic classification of DNA sequences without requiring programming knowledge. This app allows researchers to quickly classify DNA sequences using out pre-trained models.
