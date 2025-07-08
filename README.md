@@ -491,24 +491,28 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 - For more details on each parameter, see the example config files and code comments in `src/models/main_singlerank.py` and `src/models/main_multirank.py`.
 
 ---
-## 8. Results
+### 9. Category Balance for training
+### 10. Hyperparameter optimisation
+
+---
+## 11. Results
 TODO
 Checkout the Results folder.
 
 ---
 
-## 9. DNA Prediction App
+## 12. DNA Prediction App
 
 The project includes an application for taxonomic classification of DNA sequences without requiring programming knowledge. This app allows researchers to quickly classify DNA sequences using out pre-trained models.
 
-### 9.1. App Overview
+### 12.1. App Overview
 
 - Direct sequence input via text field
 - Multiple model selection (BERT, CNN, Cascade, etc.)
 - Confidence scores for each prediction level
 - Prediction of the most confident label based on the sequence inputed
 
-### 9.2. Installation
+### 12.2. Installation
 
 To run with python in the command line:
   ```bash
@@ -523,13 +527,13 @@ To run with docker:
 
 ---
 
-## xx. License
+## 13. License
 
 This project is licensed under the terms of the [MIT License](LICENSE).
 
 ---
 
-## xx. References
+## 14. References
 
 TODO: Add more references
 - Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
@@ -539,7 +543,7 @@ TODO: Add more references
 
 ---
 
-## xx. Open Research Questions
+## 15. Open Research Questions
 
 - How can data augmentation address class imbalance in this context?
 - Which encoding method performs best for each model type?
