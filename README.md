@@ -22,7 +22,7 @@ TODO
 
 ---
 ## 1. Project Structure
-
+```bash
 taxo_classification/
 ├── README.md
 ├── Dockerfile
@@ -103,6 +103,7 @@ taxo_classification/
 └── runs/
     ├── singlerank/
     └── multirank/
+ ```
     
 ---
 
