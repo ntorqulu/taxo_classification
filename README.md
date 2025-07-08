@@ -1,7 +1,7 @@
 # taxo_classification
 
 ## Introduction
-With the advent of the new DNA sequencing thecnologies, methodologies based on such thecniques have unveiled a bast field of applications to infer the Biodiversity of the ecosystems to monitorize such environments and their habitats. Among these thecniques DNA metabarcoding has emerged as a powerfull tool for biomonitoring. This thechnique relies on sequencing a targuet region of the genome of thousands of individuals at the same time and their latter assignment to the different taxa. However, one of the main constrains of the method is this taxonomic assignment due to the missing information in the databases and the amount of resources required to compute such analysis. While the latter problem has been assessed by using bigger computing services and optimizing the algorithms, to be able to run such models in the field withouth internet connection is still a challange. 
+With the advent of the new DNA sequencing technologies, methodologies based on such thecniques have unveiled a bast field of applications to infer the Biodiversity of the ecosystems to monitorize such environments and their habitats. Among these thecniques DNA metabarcoding has emerged as a powerfull tool for biomonitoring. This thechnique relies on sequencing a targuet region of the genome of thousands of individuals at the same time and their latter assignment to the different taxa. However, one of the main constrains of the method is this taxonomic assignment due to the missing information in the databases and the amount of resources required to compute such analysis. While the latter problem has been assessed by using bigger computing services and optimizing the algorithms, to be able to run such models in the field withouth internet connection is still a challange. 
 
 Here we propose Deep Learning models as a potential solution for such problem. While the training process is resource demanding, deppending on the architecture of the module, the predictions can be potentially manageable. In this project we explore the following bottlenecks of the implementation of this thecnology in the field of Biomonitoring:
 
@@ -11,9 +11,13 @@ We explored three different approaches:
 - 4xN matrix
 - One-hot-encoding
 
-### Model architechture
-- Fully connected
-- CNN
+### Model architecture
+- Fully Connected Neural Network (MLP)
+- Convolutional Neural Network (CNN)
+- Nanni CNN Variants with Attention Mechanisms
+- BERT-based Model
+- Hierarchical and Cascade Models
+- Graph Neural Network
 
 ### Category Balance for training
 
@@ -111,6 +115,142 @@ Only labels in each column with cardinality higher than the specified value will
 - `use_scheduler`: Bool, Whether to use or not the scheduler for the lr
 - `weight_decay`: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
 
+### Running Models
+
+This project supports two main types of classification models: **Singlerank** (single taxonomic level) and **Multirank** (hierarchical, multi-level). Both are configured via JSON files and run from the command line.
+
+#### 1. Singlerank Models
+
+** Run command:**
+```bash
+PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/<your_config>.json
+```
+
+- Example:
+  ```bash
+  PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/kmer_hparams.json
+  ```
+
+**Available model types:**
+- `basic` (MLP)
+- `enhanced_mlp`
+- `cnn`
+- `nanni_cnn1`
+- `nanni_cnn2`
+- `nanni_att`
+- `nanni_att_kmer`
+- `bert`
+
+**Key config parameters (singlerank):**
+| Parameter              | Type        | Description |
+|------------------------|-------------|-------------|
+| parquets_path          | str         | Path to data parquets (default: auto) |
+| dataset_name           | str         | Dataset folder name (e.g. filtered_ranks, all_ranks) |
+| max_rows               | float/int   | Proportion (0-1) or max number of rows |
+| seed                   | int         | Random seed |
+| epochs                 | int         | Number of training epochs |
+| batch_size             | int         | Batch size |
+| learning_rate          | float       | Learning rate |
+| weight_decay           | float       | Weight decay for optimizer |
+| label_column_name      | str         | Target label column (e.g. order_name) |
+| k                      | int/null    | k-mer size (if using k-mer encoding) |
+| bits                   | int/null    | One-hot encoding bits (if using one-hot/4xN) |
+| model_type             | str         | Model architecture (see above) |
+| balancing_method       | str         | 'none', 'loss_soft', 'loss_strong' |
+| optimizer              | str         | 'adam' or 'sgd' |
+| use_scheduler          | bool        | Use LR scheduler |
+| scheduler              | str         | 'plateau', 'cosine', 'by_step' |
+| scheduler_patience     | int         | Patience for scheduler |
+| scheduler_factor       | float       | LR reduction factor |
+| patience               | int         | Early stopping patience |
+| hidden_size(s)         | int/list    | Hidden layer sizes (model-specific) |
+| dropout                | float       | Dropout probability |
+| use_batch_norm         | bool        | Use batch normalization |
+| kernel_sizes           | list        | CNN kernel sizes |
+| num_filters            | list        | CNN filter counts |
+| fc_sizes               | list        | CNN fully connected sizes |
+| fast_mode              | bool        | Fast evaluation mode |
+| eval_frequency         | int         | Evaluation frequency (epochs) |
+| seq_len_filter         | int         | Filter sequences by length |
+| every_n_epochs         | int         | Scheduler step interval (by_step) |
+| vocab_size             | int         | (BERT) Vocabulary size |
+| max_length             | int         | (BERT) Max sequence length |
+| num_layers             | int         | (BERT) Number of transformer layers |
+| num_heads              | int         | (BERT/Attention) Number of heads |
+| classifier_hidden_size | int         | (BERT) Classifier hidden size |
+| embed_dim              | int         | (Attention) Embedding dimension |
+| experiment_id          | str         | Optional experiment name/ID |
+
+See `src/models/hyperparams/singlerank/` for example configs for each model type.
+
+---
+
+#### 2. Multirank (Hierarchical) Models
+
+**Run command:**
+```bash
+PYTHONPATH=$(pwd)/src/ python src/models/main_multirank.py --config src/models/hyperparams/multirank/<your_config>.json
+```
+
+- Example:
+  ```bash
+  PYTHONPATH=$(pwd)/src/ python src/models/main_multirank.py --config src/models/hyperparams/multirank/hierarchical_hparams.json
+  ```
+
+**Available model types:**
+- `hierarchical`
+- `cascade_hierarchical`
+- `gnn_hierarchical`
+
+**Key config parameters (multirank):**
+| Parameter              | Type        | Description |
+|------------------------|-------------|-------------|
+| parquets_path          | str         | Path to data parquets (default: auto) |
+| dataset_name           | str         | Dataset folder name (e.g. filtered_ranks, all_ranks) |
+| max_rows               | float/int   | Proportion (0-1) or max number of rows |
+| seed                   | int         | Random seed |
+| epochs                 | int         | Number of training epochs |
+| batch_size             | int         | Batch size |
+| learning_rate          | float       | Learning rate |
+| weight_decay           | float       | Weight decay for optimizer |
+| label_column_name      | str         | Target label column (e.g. order_name, genus_name, species_name) |
+| k                      | int/null    | k-mer size (if using k-mer encoding) |
+| bits                   | int/null    | One-hot encoding bits (if using one-hot/4xN) |
+| model_type             | str         | Model architecture (see above) |
+| balancing_method       | str         | 'none', 'loss_soft', 'loss_strong' |
+| optimizer              | str         | 'adam' or 'sgd' |
+| use_scheduler          | bool        | Use LR scheduler |
+| scheduler              | str         | 'plateau', 'cosine', 'by_step' |
+| scheduler_patience     | int         | Patience for scheduler |
+| scheduler_factor       | float       | LR reduction factor |
+| patience               | int         | Early stopping patience |
+| shared_hidden_sizes    | list        | Shared hidden layer sizes |
+| level_specific_sizes   | dict        | Per-level hidden layer sizes |
+| dropout                | float       | Dropout probability |
+| use_confidence_weighting| bool       | (Cascade) Use confidence weighting |
+| cascade_weight         | float       | (Cascade) Cascade loss weight |
+| confidence_weight      | float       | (Cascade) Confidence loss weight |
+| level_weights          | dict        | Per-level loss weights |
+| loss_type              | str         | Loss type (e.g. 'cross_entropy') |
+| focal_alpha            | float       | Focal loss alpha (if used) |
+| focal_gamma            | float       | Focal loss gamma (if used) |
+| gnn_layers             | int         | (GNN) Number of GNN layers |
+| use_attention          | bool        | (GNN) Use attention in GNN |
+| graph_weight           | float       | (GNN) Graph loss weight |
+| consistency_weight     | float       | (GNN) Consistency loss weight |
+| fast_mode              | bool        | Fast evaluation mode |
+| eval_frequency         | int         | Evaluation frequency (epochs) |
+| seq_len_filter         | int         | Filter sequences by length |
+| experiment_id          | str         | Optional experiment name/ID |
+
+See `src/models/hyperparams/multirank/` for example configs for each model type and taxonomic level.
+
+---
+
+**Notes:**
+- All config parameters can be overridden by editing the JSON config file.
+- For hierarchical models, the available taxonomic levels are detected automatically from the dataset columns.
+- For more details on each parameter, see the example config files and code comments in `src/models/main_singlerank.py` and `src/models/main_multirank.py`.
 
 # Results
 
