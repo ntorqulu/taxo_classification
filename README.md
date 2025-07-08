@@ -22,7 +22,7 @@ TODO
 
 ---
 ## 1. Project Structure
-TODO
+
 taxo_classification/
 ├── README.md
 ├── Dockerfile
