@@ -6,7 +6,17 @@ With the advent of the new DNA sequencing technologies, methodologies based on s
 Here we propose Deep Learning models as a potential solution for such problem. While the training process is resource demanding, deppending on the architecture of the module, the predictions can be potentially manageable. In this project we explore the following bottlenecks of the implementation of this thecnology in the field of Biomonitoring.
 
 ---
-## Index
+## Table of Content
+TODO
+- [Project Structure](#1-project-structure)
+- [Installation](#2-installation)
+- [Data Acquisition](#3-data-acquisition)
+  - [Source Databases](#31-source-databases)
+- [Data Preprocessing](#4-data-preprocessing)
+  - [Format Raw Data](#41-format-raw-data-with-sequenceformatter-class)
+- [Models](#models)
+  - [Single-Rank Models](#single-rank-models)
+  - [Multi-Rank Models](#multi-rank-models)
 
 ---
 
