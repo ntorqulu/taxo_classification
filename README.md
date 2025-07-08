@@ -497,6 +497,38 @@ Checkout the Results folder.
 
 ---
 
+## 8. Results
+TODO
+Checkout the Results folder.
+
+---
+
+## 9. DNA Prediction App
+
+The project includes an application for taxonomic classification of DNA sequences without requiring programming knowledge. This app allows researchers to quickly classify DNA sequences using out pre-trained models.
+
+### 9.1. App Overview
+
+- Direct sequence input via text field
+- Multiple model selection (BERT, CNN, Cascade, etc.)
+- Confidence scores for each prediction level
+- Prediction of the most confident label based on the sequence inputed
+
+### 9.2. Installation
+
+To run with python in the command line:
+  ```bash
+  # Install the app dependencies
+  pip install -r app/requirements.txt
+
+  # Launch the app
+  python -m app.run
+  ```
+
+To run with docker:
+
+---
+
 ## xx. License
 
 This project is licensed under the terms of the [MIT License](LICENSE).
@@ -507,6 +539,7 @@ This project is licensed under the terms of the [MIT License](LICENSE).
 
 TODO: Add more references
 - Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
+- Arias, P. M., Sadjadi, N., Safari, M., Gong, Z., Wang, A. T., Haurum, J. B., Zarubiieva, I., Steinke, D., Kari, L., Chang, A. X., Lowe, S. C., & Taylor, G. W. (2025). [BarcodeBERT: Transformers for Biodiversity Analysis](https://arxiv.org/abs/2311.02401)
 - [mkCOInr](https://github.com/meglecz/mkCOInr)
 - [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3)
 
