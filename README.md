@@ -1,45 +1,60 @@
-# taxo_classification
+# TAXONOMICAL CLASSIFICATION USING DEEP NEURAL NETWORK MODELS
 
 ## Introduction
 With the advent of the new DNA sequencing technologies, methodologies based on such thecniques have unveiled a bast field of applications to infer the Biodiversity of the ecosystems to monitorize such environments and their habitats. Among these thecniques DNA metabarcoding has emerged as a powerfull tool for biomonitoring. This thechnique relies on sequencing a targuet region of the genome of thousands of individuals at the same time and their latter assignment to the different taxa. However, one of the main constrains of the method is this taxonomic assignment due to the missing information in the databases and the amount of resources required to compute such analysis. While the latter problem has been assessed by using bigger computing services and optimizing the algorithms, to be able to run such models in the field withouth internet connection is still a challange. 
 
-Here we propose Deep Learning models as a potential solution for such problem. While the training process is resource demanding, deppending on the architecture of the module, the predictions can be potentially manageable. In this project we explore the following bottlenecks of the implementation of this thecnology in the field of Biomonitoring:
+Here we propose Deep Learning models as a potential solution for such problem. While the training process is resource demanding, deppending on the architecture of the module, the predictions can be potentially manageable. In this project we explore the following bottlenecks of the implementation of this thecnology in the field of Biomonitoring.
 
-### DNA codification:
-We explored three different approaches:
-- kmerisation
-- 4xN matrix
-- One-hot-encoding
+---
+## Index
 
-### Model architecture
-- Fully Connected Neural Network (MLP)
-- Convolutional Neural Network (CNN)
-- Nanni CNN Variants with Attention Mechanisms
-- BERT-based Model
-- Hierarchical and Cascade Models
-- Graph Neural Network
+---
 
-### Category Balance for training
+---
+## 1. Project Structure
 
-### Hyperparameter optimisation
+---
 
-## Methodology
-To obtained the results and to replicate them here we present the different steps followed for the analysis
+---
 
-### Obtain Database
+## 2. Installation
+
+1. **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/taxo_classification.git
+    cd taxo_classification
+    ```
+
+2. **Install dependencies:**
+    ```bash
+    pip install -r src/requirements.txt
+    ```
+
+3. **(Optional) Docker setup:**
+    ```bash
+    docker build -t taxo-classifier .
+    ```
+
+---
+## 3. Data Acquisition
+
+### 3.1. Source Databases
+
 To obtain the database we used the sequences from [mkCOInr](https://github.com/meglecz/mkCOInr) as described in [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3) and can be downloaded from google drive: [NJORDR_sequences](https://drive.google.com/file/d/1YU_jIRIm9rpEC4okD5xh2qr3EnGBg3i8/view?usp=sharing), [names.dmp](https://drive.google.com/file/d/1WrRHX5Mf23ijg03K5YNaAx3dtzgIX5Zn/view?usp=sharing) and [nodes.dmp](https://drive.google.com/file/d/1D4g7PP-mdP9xqsxM9ZC_Bz9wqANkf6UN/view?usp=sharing). These are sequences from the public databases NCBI and BOLD and sequences obtained by scientific groups in University of Barcelona, Center for Advanced Studies of Blanes and Alfred Wagener Institute.
 
-### Preprocessing
+---
+
+## 4. Data Preprocessing
 
 To clean and format the database, the following steps were performed:
 
-#### 1. Format Raw Data with `SequenceFormatter` class
+#### 4.1. Format Raw Data with `SequenceFormatter` class
 - Merge the taxonomic information and cut the region defined by the Leray-XT primers using the `SequenceFormatter` class.
 - For each sequence, retain only the information regarding the following ranks: **Superkingdom**, **Kingdom**, **Phylum**, **Order**, **Species**.
 - If any sequence has one of these ranks empty, retrieve the information from the rank immediately below (or two levels below) and mark it as *predicted* for further standardization or removal.
 - Capitalize all bases in the sequence.
 
-#### 2. Clean Data with `TaxonomyDataCleaner` class
+#### 4.2. Clean Data with `TaxonomyDataCleaner` class
 - Remove sequences shorter than **299 bp**.
 - Filter out sequences with ambiguous bases (e.g., **N**).
 - Filter out sequences with non-standard bases.
@@ -47,7 +62,7 @@ To clean and format the database, the following steps were performed:
 - Remove duplicate sequences.
 - Ensure complete taxonomic information up to the **species** level.
 
-#### 3. Create Hierarchical Dataset with `TaxonomyDataFilter` class
+#### 4.3. Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class
 - Filter sequences longer than **320 bp**.
 - Clean approximated or uncertain taxonomic names, removing or standardizing them.
 - Create four nested classification levels:
@@ -64,16 +79,110 @@ To clean and format the database, the following steps were performed:
   - **Level 4 (Order)**:  
     `Diptera`, `Lepidoptera`, `Hymenoptera`, `Coleoptera`, `Hemiptera`, `Trichoptera`, `Orthoptera`, `Ephemeroptera`, `Odonata`, `Blattodea`, `Thysanoptera`, `Psocoptera`, `Plecoptera`, `Neuroptera`, `Other_insecta`, `No_insecta`
 
----
+#### 4.4. Create Hierarchical Dataset with `TaxonomyDataFilter` class
+- Filter sequences longer than **320 bp**.
+- Clean approximated or uncertain taxonomic names, removing or standardizing them.
+- Does not created nested classification levels, keeps the names of the labels for each rank as it is.
+- All ranks from Kingdom to Species
 
-To replicate the creation of the database, run the following command from a Unix terminal:
+To replicate the creation of the database (both filtered and not filtered), run the following command from a Unix terminal:
 
 ```bash
 cd taxo_classification
 python -m src.preprocessing.filter
 ```
 
-### Testing the architechtures
+#### 4.5. Generating Parquet Files
+
+**Code Reference:**  
+- [`generate_parquets.py`](generate_parquets.py)
+- [`src/dataset/parquet_builder.py`](src/dataset/parquet_builder.py) (`ParquetBuilder` class)
+
+The project uses two main datasets:
+
+| Dataset         | Source CSV                                         | Output Parquet Directory         | Filtering Criteria                        |
+|-----------------|----------------------------------------------------|----------------------------------|-------------------------------------------|
+| filtered_ranks  | data/parquets/filtered_ranks/hierarchical_dataset_cleaned.csv.gz        | data/parquets/filtered_ranks/    | Complete taxonomy up to `order`           |
+| all_ranks       | data/parquets/all_ranks/hierarchical_dataset_cleaned.csv.gz | data/parquets/all_ranks/         | All samples, all taxonomic levels         |
+
+**To generate all parquets for the default dataset:**
+```bash
+python generate_parquets.py --coding all
+```
+**To generate a specific encoding:**
+```bash
+python generate_parquets.py --coding kmer
+python generate_parquets.py --coding bit
+python generate_parquets.py --coding 4row
+```
+**To use `all_ranks`, specify the correct CSV in your script or config.**
+
+---
+### 4.4 DNA Codification
+
+**Code Reference:**  
+- [`src/feature_extraction/main.py`](src/feature_extraction/main.py) (`SequenceCoder` class)
+- [`src/dataset/parquet_builder.py`](src/dataset/parquet_builder.py)
+
+Three main approaches are implemented:
+
+#### 4.4.1 K-merisation
+
+- **Description:** Breaks DNA into overlapping substrings of length *k* (k-mers).
+- **Implementation:** `SequenceCoder.coding_kmer_optimized`
+- **Parquet Output:** `dataset_kmer_*.parquet`
+
+#### 4.4.2 4×N Matrix (4-row Matrix)
+
+- **Description:** Each sequence is a 4×N binary matrix (A, C, G, T × sequence length).
+- **Implementation:** `SequenceCoder.coding_one_hot_4rowMatrix_optimized`
+- **Parquet Output:** `dataset_4rowmatrix.parquet`
+
+#### 4.4.3 One-hot Encoding (Bit Encoding)
+
+- **Description:** Each nucleotide is a one-hot vector, sequence is flattened.
+- **Implementation:** `SequenceCoder.coding_one_hot_bit_optimized`
+- **Parquet Output:** `dataset_bits_*.parquet`
+
+| Method         | Description                        | Output Shape      | Typical Use Case         |
+|----------------|------------------------------------|-------------------|--------------------------|
+| K-merisation   | Sequence split into k-mers         | (num_kmers,)      | Embeddings, RNNs, CNNs   |
+| 4×N Matrix     | 4 rows (A,C,G,T) × sequence length | (4, N)            | CNNs, sequence models    |
+| One-hot/Bit    | Flat vector, 4 bits per nucleotide | (4×N,)            | MLPs, simple classifiers |
+
+---
+## 5. Model Architectures
+
+**Code Reference:**  
+- [`src/models/architectures/`](src/models/architectures/)
+
+Supported architectures:
+
+- **Fully Connected Neural Network (MLP):**  
+  [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py), [`basic_model.py`](src/models/architectures/basic_model.py)
+- **Convolutional Neural Network (CNN):**  
+  [`cnn_model.py`](src/models/architectures/cnn_model.py)
+- **Nanni CNN Variants:**  
+  [`nanni2024.py`](src/models/architectures/nanni2024.py)  
+  Includes Nanni CNN1, Nanni CNN2, and attention-based models.
+- **BERT-based Model:**  
+  [`bert_model.py`](src/models/architectures/bert_model.py)
+- **Hierarchical/Cascade Models:**  
+  [`hierarchical_model.py`](src/models/architectures/hierarchical_model.py), [`cascade_hierarchical_model.py`](src/models/architectures/cascade_hierarchical_model.py)
+- **Graph Neural Network (GNN):**  
+  [`gnn_hierarchical_model.py`](src/models/architectures/gnn_hierarchical_model.py)
+
+**Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
+
+---
+
+## 6. Configuration and Hyperparameters
+
+**Code Reference:**  
+- [`src/models/hyperparams/`](src/models/hyperparams/)
+- [`src/models/main_singlerank.py`](src/models/main_singlerank.py)
+- [`src/models/main_multirank.py`](src/models/main_multirank.py)
+
 #### Hyperparams JSON
 To parse the different hyperparameters and the different options for each experiment a json can be used. When running the model you can parse the json with the option --config
 
@@ -115,11 +224,16 @@ Only labels in each column with cardinality higher than the specified value will
 - `use_scheduler`: Bool, Whether to use or not the scheduler for the lr
 - `weight_decay`: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
 
-### Running Models
+## 7. Training
+
+**Code Reference:**  
+- [`src/models/main_singlerank.py`](src/models/main_singlerank.py)
+- [`src/models/main_multirank.py`](src/models/main_multirank.py)
+- [`src/models/training/`](src/models/training/)
 
 This project supports two main types of classification models: **Singlerank** (single taxonomic level) and **Multirank** (hierarchical, multi-level). Both are configured via JSON files and run from the command line.
 
-#### 1. Singlerank Models
+### 7.1. Single-rank Models
 
 ** Run command:**
 ```bash
@@ -185,7 +299,7 @@ See `src/models/hyperparams/singlerank/` for example configs for each model type
 
 ---
 
-#### 2. Multirank (Hierarchical) Models
+### 7.2. Multirank (Hierarchical) Models
 
 **Run command:**
 ```bash
@@ -252,18 +366,33 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 - For hierarchical models, the available taxonomic levels are detected automatically from the dataset columns.
 - For more details on each parameter, see the example config files and code comments in `src/models/main_singlerank.py` and `src/models/main_multirank.py`.
 
-# Results
+---
+## 8. Results
 
 Checkout the Results folder.
 
-# Preguntes a resoldre:
-## Donat que tenim un problema de balanceig, podem solucionar-ho amb data augmentation? comparem diferents mètodes amb no augmentar les dades.
+---
 
-## evaluar quin encoding dels que proposem va millor per cada model
+## xx. License
 
-## comparar la performance dels diferents models
+[MIT License](LICENSE)
 
-## provar amb totes les classes a nivell d'ordre
+---
 
+## xx. References
 
+- Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
+- [mkCOInr](https://github.com/meglecz/mkCOInr)
+- [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3)
+
+---
+
+## xx. Open Research Questions
+
+- How can data augmentation address class imbalance in this context?
+- Which encoding method performs best for each model type?
+- How do different models compare in terms of classification performance?
+- What is the impact of including all classes at the order level?
+
+---
 
