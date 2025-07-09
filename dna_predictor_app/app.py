@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import torch
 import numpy as np
+from model_utils import get_model_hyperparameters
 
 # Add src to path - try multiple possible locations
 possible_src_paths = [
@@ -213,7 +214,9 @@ def predict_sequence(sequence: str, model_path: str):
         model, device, config, checkpoint_class_names = load_model(model_path)
         
         # Get model metadata from path or config
+        model_dir = Path(model_path).parent
         model_metadata = get_model_by_name(Path(model_path).parent.name)
+        hyperparameters = get_model_hyperparameters(model_dir)
         if model_metadata:
             encoding_type = model_metadata.get('encoding', '4row')
             rank = model_metadata.get('rank', 'order')
@@ -314,7 +317,8 @@ def predict_sequence(sequence: str, model_path: str):
                         'probability': prob.item()
                     }
                     for prob, idx in zip(top_probs, top_indices)
-                ]
+                ],
+                'hyperparameters': hyperparameters
             }
             
             return results
@@ -364,6 +368,17 @@ def get_models_api():
     """API endpoint to get available models."""
     models = list_models()
     return jsonify(models)
+
+@app.route("/api/model_hparams/<model_name>")
+def get_model_hparams_api(model_name):
+    """API endpoint to get model hyperparameters."""
+    models = list_models()
+    for model in models:
+        if model["name"] == model_name:
+            model_dir = Path(model["path"]).parent
+            hparams = get_model_hyperparameters(model_dir)
+            return jsonify(hparams)
+    return jsonify({"error": "Model not found"}), 404
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -72,3 +72,25 @@ def get_model_by_name(model_name):
         if model["name"] == model_name:
             return model
     return None
+
+# Add this function to model_utils.py
+def get_model_hyperparameters(model_dir):
+    """Get hyperparameters from JSON file in model directory."""
+    import json
+    
+    model_dir = Path(model_dir)
+    hparams = {}
+    
+    # Look for JSON files in the model directory
+    json_files = list(model_dir.glob("*.json"))
+    
+    if json_files:
+        try:
+            # Use the first JSON file found
+            with open(json_files[0], 'r') as f:
+                hparams = json.load(f)
+            return hparams
+        except Exception as e:
+            print(f"Error loading hyperparameters: {e}")
+    
+    return hparams
