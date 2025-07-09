@@ -49,7 +49,6 @@ def list_models():
                 "encoding": encoding,
                 "display_name": display_name,
             })
-            print(f"Found model: {display_name} ({model_type}) with encoding {encoding} in {model_dir}")
         except Exception as e:
             print(f"Error parsing model directory {model_dir}: {e}")
     return models
