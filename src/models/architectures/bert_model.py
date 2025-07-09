@@ -151,6 +151,9 @@ class BERTTaxoModel(BaseModel):
             'output_size': self.output_size,
             'classifier_hidden_size': self.classifier_hidden_size,
         })
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
     
     @classmethod
@@ -177,6 +180,9 @@ class BERTTaxoModel(BaseModel):
                 name=config.get('name', 'BERTTaxoModel')
             )
             
+            # Restore class_names if present
+            if 'class_names' in config:
+                model.class_names = config['class_names']
             # Load the state dict, ignoring kmer_classifier related keys
             state_dict = checkpoint['model_state_dict']
             # Filter out kmer_classifier keys if present

@@ -3,7 +3,7 @@
     "dataset_name": "filtered_ranks",
     "max_rows": 1.0,
     "seed": 123,
-    "epochs": 50,
+    "epochs": 2,
     "batch_size": 30,
     "learning_rate": 0.001,
     "weight_decay": 0,

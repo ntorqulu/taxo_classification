@@ -101,13 +101,15 @@ class CNNModel(BaseModel):
             'fc_sizes': self.fc_sizes,
             'dropout': self.dropout
         })
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
     
     @classmethod
     def load(cls, path: str, map_location: Optional[str] = None) -> 'CNNModel':
         checkpoint = torch.load(path, map_location=map_location)
         config = checkpoint['model_config']
-        
         model = cls(
             input_size=config['input_size'],
             output_size=config['output_size'],
@@ -117,6 +119,8 @@ class CNNModel(BaseModel):
             dropout=config.get('dropout', 0.3),
             name=config.get('name', 'CNN')
         )
-        
+        # Restore class_names if present
+        if 'class_names' in config:
+            model.class_names = config['class_names']
         model.load_state_dict(checkpoint['model_state_dict'])
         return model

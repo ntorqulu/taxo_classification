@@ -70,6 +70,9 @@ class EnhancedMLP(BaseModel):
             'dropout': self.dropout,
             'use_batch_norm': self.use_batch_norm
         })
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
     
     @classmethod
@@ -86,5 +89,8 @@ class EnhancedMLP(BaseModel):
             name=config.get('name', 'EnhancedMLP')
         )
         
+        # Restore class_names if present
+        if 'class_names' in config:
+            model.class_names = config['class_names']
         model.load_state_dict(checkpoint['model_state_dict'])
         return model

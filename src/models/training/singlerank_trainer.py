@@ -866,6 +866,7 @@ class Trainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'model_name': self.model.name,
+            'class_names': self.class_names,  # Save class names
         }
         
         if self.scheduler is not None:
@@ -898,3 +899,7 @@ class Trainer:
         if hasattr(self.model, 'set_config'):
             self.model.set_config(checkpoint['model_config'])
         self.epoch_checkpoint = checkpoint['epoch']
+        # Load class names if present
+        if 'class_names' in checkpoint:
+            self.class_names = checkpoint['class_names']
+            self.class_idx_to_name = {idx: name for idx, name in enumerate(self.class_names)}
