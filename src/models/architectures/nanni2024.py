@@ -54,6 +54,9 @@ class nanni_cnn1(BaseModel):
         config.update(
             {"sequence_length": self.sequence_length, "hidden_size": self.hidden_size, "output_size": self.output_size}
         )
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
 
     @classmethod
@@ -67,6 +70,9 @@ class nanni_cnn1(BaseModel):
             output_size=config["output_size"],
             name=config.get("name", "nanni_cnn1"),
         )
+        # Restore class_names if present
+        if 'class_names' in config:
+            model.class_names = config['class_names']
 
         model.load_state_dict(checkpoint["model_state_dict"])
         return model
@@ -139,6 +145,9 @@ class nanni_cnn2(BaseModel):
         config.update(
             {"sequence_length": self.sequence_length, "hidden_size": self.hidden_size, "output_size": self.output_size}
         )
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
 
     @classmethod
@@ -152,6 +161,9 @@ class nanni_cnn2(BaseModel):
             output_size=config["output_size"],
             name=config.get("name", "nanni_cnn2"),
         )
+        # Restore class_names if present
+        if 'class_names' in config:
+            model.class_names = config['class_names']
 
         model.load_state_dict(checkpoint["model_state_dict"])
         return model

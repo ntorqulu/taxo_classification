@@ -39,6 +39,9 @@ class BasicTaxoModel(BaseModel):
             'hidden_size': self.hidden_size,
             'output_size': self.output_size,
         })
+        # Add class_names if present
+        if hasattr(self, 'class_names'):
+            config['class_names'] = self.class_names
         return config
     
     @classmethod
@@ -53,5 +56,8 @@ class BasicTaxoModel(BaseModel):
             name=config.get('name', 'BasicMLP')
         )
         
+        # Restore class_names if present
+        if 'class_names' in config:
+            model.class_names = config['class_names']
         model.load_state_dict(checkpoint['model_state_dict'])
         return model

@@ -278,6 +278,7 @@ def run_experiment(hparams: dict) -> dict:
     info(f"Using {len(class_names)} labels for {hparams['label_column_name']} classification.")
     info(f"Class names: {', '.join(class_names)}")
 
+    # Pass class_names to Trainer so they are saved in checkpoints and available for evaluation
     trainer = Trainer(
         model=model,
         criterion=criterion,

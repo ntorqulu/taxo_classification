@@ -1,35 +1,56 @@
 import os
 from pathlib import Path
+import torch
+import re
 
-CHECKPOINTS_DIR = Path("../checkpoints")  # Adjust path as needed
+CHECKPOINTS_DIR = Path("../Results")  # Adjust path as needed
 
 def list_models():
-    """Scan checkpoints directory for available models starting with 'best_'."""
+    """Scan checkpoints directory for available models (only *best.pt in each subdir, display folder name as display_name)."""
     models = []
-    
+    if not CHECKPOINTS_DIR.exists():
+        print(f"Warning: Checkpoints directory {CHECKPOINTS_DIR} not found.")
+        return models
     for model_dir in CHECKPOINTS_DIR.iterdir():
-        if model_dir.is_dir() and model_dir.name.startswith("best_"):
-            # Look for .pt files in the model directory
-            for file in model_dir.glob("*.pt"):
-                # Parse model name: best_nanni_cnn2_20250705-193402_order_name_bits0
-                parts = model_dir.name.split("_")
-                
-                # Extract components
-                model_type = parts[1] + "_" + parts[2]  # nanni_cnn2
-                date = parts[3]  # 20250705-193402
-                rank = parts[4]  # order
-                encoding = parts[5]  # bits0
-                
-                models.append({
-                    "name": model_dir.name,
-                    "path": str(file),
-                    "model_type": model_type,
-                    "rank": rank,
-                    "encoding": encoding,
-                    "date": date,
-                    "display_name": f"{model_type.replace('_', ' ').title()} - {rank.title()}"
-                })
-    
+        if not model_dir.is_dir():
+            continue
+        # Only consider *best.pt files
+        best_files = list(model_dir.glob('*best.pt'))
+        if not best_files:
+            continue
+        best_file = best_files[0]  # If multiple, just take the first
+        folder = model_dir.name
+        display_name = folder.replace('_', ' ')
+        try:
+            checkpoint = torch.load(best_file, map_location='cpu')
+            config = checkpoint.get('model_config', {})
+            model_type = config.get('model_type', '')
+            rank = config.get('label_column_name', '')
+            # Encoding logic based on folder name
+            if folder.endswith('bits0'):
+                encoding = '4row'
+            # Use regex to match _k{number} pattern for k-mer encoding
+            elif re.search(r'_k(\d+)$', folder):
+                k_value = re.search(r'_k(\d+)$', folder).group(1)
+                encoding = f'kmer_{k_value}'
+            # Use regex to match _bits{number} pattern for bits encoding
+            elif re.search(r'_bits(\d+)$', folder):
+                bits_value = re.search(r'_bits(\d+)$', folder).group(1)
+                encoding = f'bits_{bits_value}'
+            elif '4row' in folder:
+                encoding = '4row'
+            else:
+                encoding = folder
+            models.append({
+                "name": folder,
+                "path": str(best_file),
+                "model_type": model_type,
+                "rank": rank,
+                "encoding": encoding,
+                "display_name": display_name,
+            })
+        except Exception as e:
+            print(f"Error parsing model directory {model_dir}: {e}")
     return models
 
 def get_encodings():
@@ -51,3 +72,25 @@ def get_model_by_name(model_name):
         if model["name"] == model_name:
             return model
     return None
+
+# Add this function to model_utils.py
+def get_model_hyperparameters(model_dir):
+    """Get hyperparameters from JSON file in model directory."""
+    import json
+    
+    model_dir = Path(model_dir)
+    hparams = {}
+    
+    # Look for JSON files in the model directory
+    json_files = list(model_dir.glob("*.json"))
+    
+    if json_files:
+        try:
+            # Use the first JSON file found
+            with open(json_files[0], 'r') as f:
+                hparams = json.load(f)
+            return hparams
+        except Exception as e:
+            print(f"Error loading hyperparameters: {e}")
+    
+    return hparams

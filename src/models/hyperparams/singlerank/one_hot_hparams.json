@@ -1,18 +1,18 @@
 {
   "parquets_path": "",
-  "dataset_name": "filtered_ranks",
-  "max_rows": 10000,
+  "dataset_name": "all_ranks",
+  "max_rows": 1.0,
   "seed": 123,
-  "epochs": 40,
+  "epochs": 2,
   "batch_size": 30,
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
-  "label_column_name": "order_name",
+  "label_column_name": "phylum_name",
   "k": null,
   "bits": 4,
   "hidden_size": null,
   
-  "model_type": "enhanced_mlp",
+  "model_type": "cnn",
   "balancing_method": "none",
   "optimizer": "adam",
   "use_scheduler": true,
@@ -29,7 +29,5 @@
   "num_filters": [64, 128, 256],
   "fc_sizes": [512, 256],
 
-  "seq_len_filter": 313,
-  "fast_mode": true,
-  "eval_frequency": 5
+  "fast_mode": true
 }
