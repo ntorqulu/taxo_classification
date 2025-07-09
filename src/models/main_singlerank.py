@@ -18,6 +18,8 @@ from models.training.singlerank_trainer import Trainer
 
 from models.utils.model_factory import create_model
 
+import logging
+
 
 def init_device(seed: int = 42) -> torch.device:
     np.random.seed(seed)
@@ -336,6 +338,28 @@ def main():
     # Set default dataset path if not provided
     if hparams["parquets_path"] == "":
         hparams["parquets_path"] = get_base_parquets_path()
+        
+    # Log the terminal output to a file
+    log_to_file = hparams.get("log_file", False)
+    exp_id = hparams.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
+    model_type = hparams.get('model_type', 'basic')
+    label_column_name = hparams['label_column_name']
+    k = hparams.get('k')
+    bits = hparams.get('bits')
+    if k:
+        run_name = f"{model_type}_{exp_id}_{label_column_name}_k{k}"
+    else:
+        run_name = f"{model_type}_{exp_id}_{label_column_name}_bits{bits}"
+
+    if log_to_file:
+        os.makedirs("logs", exist_ok=True)
+        log_filename = os.path.join("logs", f"{run_name}.log")
+        file_handler = logging.FileHandler(log_filename)
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        file_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(file_handler)
+    
+    info(f"Using configuration file {args.config}")
 
     # Track timing
     t0 = time.time()

@@ -3,16 +3,16 @@
   "dataset_name": "all_ranks",
   "max_rows": 1.0,
   "seed": 123,
-  "epochs": 15,
-  "batch_size": 30,
+  "epochs": 2,
+  "batch_size": 64,
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
-  "label_column_name": "order_name",
+  "label_column_name": "family_name",
   "k": 4,
   "bits": null,
   "hidden_size": null,
   
-  "model_type": "cnn",
+  "model_type": "enhanced_mlp",
   "balancing_method": "none",
   "optimizer": "adam",
   "use_scheduler": true,
@@ -29,7 +29,8 @@
   "num_filters": [64, 128, 256],
   "fc_sizes": [512, 256],
 
-  "fast_mode": true,
-  "eval_frequency": 5,
-  "seq_len_filter": 313
+  "fast_mode": false,
+  "min_cardinality_filters":  {"family_name": 40},
+
+  "log_file": true
 }
