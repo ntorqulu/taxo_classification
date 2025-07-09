@@ -4,6 +4,7 @@ import os
 import time
 from pathlib import Path
 import torch
+import logging
 from models.utils.model_factory import create_model
 from models.training.multirank_trainer import HierarchicalTrainer
 from dataset.hierarchical_dataset import HierarchicalDataset
@@ -27,6 +28,26 @@ def main():
     else:
         # Use default path
         data_path = get_base_parquets_path() / dataset_name
+    
+    # Log the terminal output to a file
+    log_to_file = config.get("log_file", False)
+    exp_id = config.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
+    model_type = config.get('model_type', 'basic')
+    label_column_name = config['label_column_name']
+    k = config.get('k')
+    bits = config.get('bits')
+    if k:
+        run_name = f"{model_type}_{exp_id}_{label_column_name}_k{k}"
+    else:
+        run_name = f"{model_type}_{exp_id}_{label_column_name}_bits{bits}"
+
+    if log_to_file:
+        os.makedirs("logs", exist_ok=True)
+        log_filename = os.path.join("logs", f"{run_name}.log")
+        file_handler = logging.FileHandler(log_filename)
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        file_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(file_handler)
     
     info(f"Using data path: {data_path}")
     info(f"Dataset name: {dataset_name}")

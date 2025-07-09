@@ -5,6 +5,13 @@ import torch.optim as optim
 from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 import os
 import time
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+from PIL import Image
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_recall_fscore_support
+import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
 from dataset.utils import info
 
@@ -229,7 +236,6 @@ class Trainer:
     @torch.no_grad()
     def compute_per_class_metrics(self, data_loader: DataLoader, epoch: int, prefix: str = 'val') -> Dict[str, float]:
         """Compute metrics for each class."""
-        from sklearn.metrics import precision_recall_fscore_support
         
         self.model.eval()
         
@@ -302,14 +308,15 @@ class Trainer:
         
         return metrics
 
-    def log_confusion_matrix(self, data_loader: DataLoader, epoch: int, prefix: str = 'val'):
+    def log_confusion_matrix(self, data_loader, epoch: int, prefix: str = 'val', n: int = 20):
         """
-        Generate and log confusion matrix to TensorBoard.
-        
+        Generate and log Top-N and Bottom-N confusion matrices to TensorBoard.
+
         Args:
             data_loader: DataLoader for validation/test data
             epoch: Current epoch number
             prefix: Prefix for TensorBoard logs ('val' or 'test')
+            n: Number of classes to show in Top-N/Bottom-N
         """
         try:
             import matplotlib.pyplot as plt
@@ -321,11 +328,11 @@ class Trainer:
         except ImportError:
             info("Skipping confusion matrix visualization: required libraries not available")
             return
-            
+
         self.model.eval()
         all_preds = []
         all_targets = []
-        
+
         # Collect predictions and targets
         with torch.no_grad():
             for data, target in data_loader:
@@ -334,85 +341,75 @@ class Trainer:
                     data = data.unsqueeze(1)
                 output = self.model(data)
                 preds = output.argmax(dim=1)
-                
-                # Ensure both are flattened to 1D arrays
                 all_preds.extend(preds.cpu().numpy().flatten())
                 all_targets.extend(target.cpu().numpy().flatten())
-        
-        # Convert to numpy arrays
+
         all_preds = np.array(all_preds)
         all_targets = np.array(all_targets)
-        
-        # Ensure they're both 1D
-        if all_targets.ndim > 1:
-            all_targets = all_targets.flatten()
-        
-        if all_preds.ndim > 1:
-            all_preds = all_preds.flatten()
-        
+
         # Get unique classes from both arrays
         unique_classes = np.unique(np.concatenate([all_targets, all_preds]))
         num_classes = len(unique_classes)
-        
+
         # Use class names if available
         if self.class_names and len(self.class_names) >= num_classes:
-            labels = self.class_names[:num_classes]
+            labels = self.class_names
         else:
             labels = [f"Class {i}" for i in range(num_classes)]
-        
-        # Generate confusion matrix
-        cm = confusion_matrix(all_targets, all_preds, labels=range(num_classes))
-        
-        # Create two versions: raw counts and normalized
-        
-        # 1. Raw counts
-        plt.figure(figsize=(12, 10))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=labels, yticklabels=labels)
-        plt.title(f'{prefix} Confusion Matrix (Raw Counts) - Epoch {epoch}')
-        plt.ylabel('True Phylum')
-        plt.xlabel('Predicted Phylum')
-        plt.xticks(rotation=45, ha='right')
-        plt.yticks(rotation=45)
-        plt.tight_layout()
-        
-        # Convert plot to image
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        image = Image.open(buf)
-        image_array = np.array(image)
-        
-        # Add to TensorBoard (convert to CxHxW format)
-        image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
-        self.writer.add_image(f'Confusion_Matrix_Raw/{prefix}', image_tensor, epoch)
-        plt.close()
-        
-        # 2. Normalize by row (true labels)
-        row_sums = cm.sum(axis=1, keepdims=True)
-        cm_norm = np.divide(cm.astype('float'), row_sums, out=np.zeros_like(cm, dtype=float), where=row_sums!=0)
-        
-        plt.figure(figsize=(12, 10))
-        sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues', 
-                xticklabels=labels, yticklabels=labels)
-        plt.title(f'{prefix} Confusion Matrix (Normalized) - Epoch {epoch}')
-        plt.ylabel('True Phylum')
-        plt.xlabel('Predicted Phylum')
-        plt.xticks(rotation=45, ha='right')
-        plt.yticks(rotation=45)
-        plt.tight_layout()
-        
-        # Convert plot to image
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        image = Image.open(buf)
-        image_array = np.array(image)
-        
-        # Add to TensorBoard (convert to CxHxW format)
-        image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
-        self.writer.add_image(f'Confusion_Matrix_Norm/{prefix}', image_tensor, epoch)
-        plt.close()
+
+        # Compute confusion matrix
+        cm = confusion_matrix(all_targets, all_preds, labels=range(len(labels)))
+
+        # Compute class support (number of true samples per class)
+        class_support = cm.sum(axis=1)
+
+        # Get Top-N and Bottom-N indices
+        top_n_idx = np.argsort(class_support)[-n:][::-1]  # Most frequent
+        bottom_n_idx = np.argsort(class_support)[:n]      # Least frequent
+
+        def plot_and_log(cm_sub, idx, tag):
+            labels_sub = [labels[i] for i in idx]
+            # Raw counts
+            plt.figure(figsize=(max(8, n//2), max(6, n//2)))
+            sns.heatmap(cm_sub, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=labels_sub, yticklabels=labels_sub)
+            plt.title(f'{prefix.capitalize()} Confusion Matrix ({tag}) - Epoch {epoch}')
+            rank_name = getattr(self, 'label_column_name', 'Label')
+            plt.ylabel(f'True {rank_name.capitalize()}')
+            plt.xlabel(f'Predicted {rank_name.capitalize()}')
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            image = Image.open(buf)
+            image_array = np.array(image)
+            image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
+            self.writer.add_image(f'Confusion_Matrix_{tag}_Raw/{prefix}', image_tensor, epoch)
+            plt.close()
+
+            # Normalized
+            row_sums = cm_sub.sum(axis=1, keepdims=True)
+            cm_norm = np.divide(cm_sub.astype('float'), row_sums, out=np.zeros_like(cm_sub, dtype=float), where=row_sums!=0)
+            plt.figure(figsize=(max(8, n//2), max(6, n//2)))
+            sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues',
+                        xticklabels=labels_sub, yticklabels=labels_sub)
+            plt.title(f'{prefix.capitalize()} Confusion Matrix ({tag}, Normalized) - Epoch {epoch}')
+            plt.ylabel(f'True {rank_name.capitalize()}')
+            plt.xlabel(f'Predicted {rank_name.capitalize()}')
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            image = Image.open(buf)
+            image_array = np.array(image)
+            image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
+            self.writer.add_image(f'Confusion_Matrix_{tag}_Norm/{prefix}', image_tensor, epoch)
+            plt.close()
+
+        # Plot and log Top-N
+        plot_and_log(cm[top_n_idx][:, top_n_idx], top_n_idx, f'Top{n}')
+        # Plot and log Bottom-N
+        plot_and_log(cm[bottom_n_idx][:, bottom_n_idx], bottom_n_idx, f'Bottom{n}')
     
     def log_class_performance_chart(self, data_loader: DataLoader, epoch: int, prefix: str = 'val'):
         """
@@ -460,7 +457,7 @@ class Trainer:
             plt.text(acc + 0.01, i, f'{acc:.2f}', va='center')
         
         plt.yticks(y_pos, sorted_labels)
-        plt.title(f'Phylum Classification Accuracy ({prefix}) - Epoch {epoch}')
+        plt.title(f'Rank Classification Accuracy ({prefix}) - Epoch {epoch}')
         plt.xlabel('Accuracy')
         plt.xlim(0, 1.1)
         plt.grid(axis='x', linestyle='--', alpha=0.7)
@@ -501,7 +498,7 @@ class Trainer:
             plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ['0.2', '0.4', '0.6', '0.8', '1.0'], color='gray')
             plt.ylim(0, 1)
             
-            plt.title(f'Phylum Classification Accuracy - Radar View - Epoch {epoch}')
+            plt.title(f'Rank Classification Accuracy - Radar View - Epoch {epoch}')
             
             # Convert to image and log to TensorBoard
             buf = io.BytesIO()
@@ -510,7 +507,7 @@ class Trainer:
             image = Image.open(buf)
             image_array = np.array(image)
             image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
-            self.writer.add_image(f'Phylum_Radar/{prefix}', image_tensor, epoch)
+            self.writer.add_image(f'Rank_Radar/{prefix}', image_tensor, epoch)
             plt.close()
     
     def log_phylum_evolution_chart(self, history: Dict[str, List], epoch: int):
@@ -527,7 +524,7 @@ class Trainer:
             import io
             from PIL import Image
         except ImportError:
-            info("Skipping phylum evolution chart: required libraries not available")
+            info("Skipping rank evolution chart: required libraries not available")
             return
         
         # Extract per-class metrics history
@@ -570,7 +567,7 @@ class Trainer:
             # Plot line
             plt.plot(epochs_range, values, 'o-', label=class_name)
             
-        plt.title(f'Phylum Classification Accuracy Evolution - Epoch {epoch}')
+        plt.title(f'Rank Classification Accuracy Evolution - Epoch {epoch}')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.ylim(0, 1.1)
@@ -585,7 +582,7 @@ class Trainer:
         image = Image.open(buf)
         image_array = np.array(image)
         image_tensor = torch.from_numpy(image_array.transpose(2, 0, 1))
-        self.writer.add_image(f'Phylum_Evolution', image_tensor, epoch)
+        self.writer.add_image(f'Rank_Evolution', image_tensor, epoch)
         plt.close()
     
     def log_learning_progress_table(self, metrics: Dict[str, float], epoch: int, prefix: str = 'val'):
@@ -622,7 +619,7 @@ class Trainer:
                 class_names.append(f"Class {idx}")
         
         # Create markdown table
-        table = "| Phylum | Accuracy | Loss |\n"
+        table = "| Rank | Accuracy | Loss |\n"
         table += "| --- | --- | --- |\n"
         
         # Sort by accuracy (descending)
@@ -852,7 +849,7 @@ class Trainer:
                 final_class_metrics = self.compute_per_class_metrics(test_loader, epochs, prefix='final')
                 
                 # Log confusion matrix for final model
-                self.log_confusion_matrix(test_loader, epochs, prefix='final')
+                self.log_confusion_matrix(test_loader, epochs, prefix='final', n=20)
         
         return history
     
