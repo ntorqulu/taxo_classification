@@ -12,11 +12,14 @@ In summary the project has evaluated three different factor
 
 
 In this folder the results are structured in the following way:
-
-- Results
-    |- logs
-        | - copied folder for TensorFlow 
-    |- result of each case
-        |- README.md
-        |- json
-        |- best checkout
+```bash
+Results/
+├── logs/
+│   └── copied_folder_for_Tensorboard
+└── Result_for_each_experiment/
+    ├── README.md
+    ├── json
+    ├── stdr_err.txt/logfile (if possible)
+    ├── best checkout
+    └── gnn_hierarchical_model.py
+```
