@@ -172,6 +172,38 @@ def run_experiment(hparams: dict) -> dict:
     # Create model
     model = create_model(model_type=hparams.get("model_type", "basic"), **model_params).to(device)
 
+    if hparams.get("transfer_learning", False):
+        from_checkpoint_path = hparams.get("from_checkpoint_path", None)
+        if from_checkpoint_path is None:
+            raise ValueError("If transfer_learning is True, from_checkpoint_path must be given.")
+        else:
+            checkpoint = torch.load(from_checkpoint_path, map_location=device)
+        info(f"Loading model weights from {from_checkpoint_path}")
+        if hparams.get("model_type", "basic") == "nanni_cnn1":
+            # check that checkpoint['model_name'] has the word 'nanni_cnn1'
+            if not re.search(r'nanni_cnn1', checkpoint['model_name']):
+                raise ValueError(f"Checkpoint model name {checkpoint['model_name']} does not match expected 'nanni_cnn1'")
+            # transfer only the cnn1 part of the model
+            new_state_dict = {
+                "weight": checkpoint["model_state_dict"]["conv1.weight"],
+                "bias": checkpoint["model_state_dict"]["conv1.bias"]
+                }
+            model.conv1.load_state_dict(new_state_dict)
+        elif hparams.get("model_type", "basic") == "nanni_cnn2":
+            # check that checkpoint['model_name'] has the word 'nanni_cnn2'
+            if not re.search(r'nanni_cnn2', checkpoint['model_name']):
+                raise ValueError(f"Checkpoint model name {checkpoint['model_name']} does not match expected 'nanni_cnn2'")
+            # transfer only the cnn2 part of the model
+            new_state_dict_conv1 = {
+                "weight": checkpoint["model_state_dict"]["conv1.weight"],
+                "bias": checkpoint["model_state_dict"]["conv1.bias"]
+                }
+            model.conv1.load_state_dict(new_state_dict)
+            new_state_dict_conv2 = {
+                "weight": checkpoint["model_state_dict"]["conv2.weight"],
+                "bias": checkpoint["model_state_dict"]["conv2.bias"]
+                }
+            model.conv2.load_state_dict(new_state_dict_conv2)
     # Set up training components
 
     # Loss criterion
@@ -291,6 +323,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train taxonomy classification models")
     parser.add_argument(
         "--config", type=str, default="hyperparams/kmer_hparams.json", help="Path to hyperparameters JSON file"
+        # "--config", type=str, default="TL_nanni_cnn1.json", help="Path to hyperparameters JSON file"
     )
     
     args = parser.parse_args()
