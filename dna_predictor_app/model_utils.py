@@ -20,7 +20,18 @@ def list_models():
             continue
         best_file = best_files[0]  # If multiple, just take the first
         folder = model_dir.name
-        display_name = folder.replace('_', ' ')
+
+        # Obtaint the model title
+        readme_file = model_dir / 'README.md'
+        display_name = None
+        if readme_file.exists():
+            first_line = readme_file.read_text().splitlines()[0]
+            if first_line.startswith('#'):
+                display_name = first_line[1:].strip()
+
+        if not display_name:
+            display_name = folder.replace('_', ' ')
+
         try:
             checkpoint = torch.load(best_file, map_location='cpu')
             config = checkpoint.get('model_config', {})
