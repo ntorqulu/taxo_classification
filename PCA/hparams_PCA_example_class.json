@@ -1,0 +1,31 @@
+{
+    "parquets_path": "",
+    "dataset_name": "all_ranks_genus_filtered",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 20,
+    "batch_size": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 0,
+    "label_column_name": "class_name",
+    "k": null,
+    "bits": 0, 
+    "hidden_size": 8,
+    "sequence_column": "sequence",
+    "input_csv": "PCA/real_seqs.tsv",
+    "output_csv": "PCA/embeddings_class.tsv",
+    "from_checkpoint_path": "PCA/nanni_cnn1_20250707-182637_best.pt",
+    
+    "model_type": "nanni_cnn1",
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "by_step",
+    "every_n_epochs": 50,
+
+    "seq_len_filter": 313,
+    
+    "dropout": 0.5,
+    "use_batch_norm": true,
+    "fast_mode": true
+
+  }
