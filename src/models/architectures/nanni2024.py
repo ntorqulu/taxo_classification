@@ -58,6 +58,14 @@ class nanni_cnn1(BaseModel):
         if hasattr(self, 'class_names'):
             config['class_names'] = self.class_names
         return config
+    
+    def return_embedding(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Returns the embedding from the first fully connected layer.
+        This is useful for obtaining embeddings without the final classification layer.
+        """
+        embedding = self.conv1(x)
+        return embedding
 
     @classmethod
     def load(cls, path: str, map_location: Optional[str] = None) -> "nanni_cnn1":
