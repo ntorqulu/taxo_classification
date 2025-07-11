@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from model_utils import get_model_hyperparameters
+import torch.nn as nn
 
 # Add src to path - try multiple possible locations
 possible_src_paths = [
@@ -86,13 +87,53 @@ def load_model(checkpoint_path):
             embed_dim=model_config.get('embed_dim', 64),
             hidden_size=model_config.get('hidden_size', 100)
         )
-    elif 'nanni_att' in model_type:
+    # In the nanni_att with bits section, replace your current code with this:
+    elif 'nanni_att' in model_type and 'bits' in model_type:
         model = nanni_att(
             sequence_length=model_config.get('sequence_length', 313),
             output_size=model_config.get('output_size', 16),
             num_heads=model_config.get('num_heads', 8),
             embed_dim=model_config.get('embed_dim', 64),
             hidden_size=model_config.get('hidden_size', 100)
+        )
+        
+        # Extract encoding details
+        model_metadata = get_model_by_name(Path(checkpoint_path).parent.name)
+        if model_metadata and 'encoding' in model_metadata:
+            encoding_type = model_metadata.get('encoding', '4row')
+            if encoding_type.startswith('bits'):
+                # Extract bits value
+                bits = 4
+                if '_' in encoding_type:
+                    try:
+                        bits = int(encoding_type.split('_')[1])
+                    except:
+                        pass
+                        
+                # Extract the exact input size from the checkpoint
+                if 'model_state_dict' in checkpoint and 'vector_projection.weight' in checkpoint['model_state_dict']:
+                    vector_proj_weight = checkpoint['model_state_dict']['vector_projection.weight']
+                    actual_input_size = vector_proj_weight.shape[1]  # Get exact input dimension
+                    embed_dim = vector_proj_weight.shape[0]  # Get exact output dimension
+                    
+                    print(f"Using exact dimensions from checkpoint: input_size={actual_input_size}, embed_dim={embed_dim}")
+                    
+                    # Pre-initialize with dimensions from checkpoint
+                    model.vector_projection = nn.Linear(actual_input_size, embed_dim).to(device)
+                else:
+                    # Fallback to estimation if weight not found (shouldn't happen)
+                    seq_length = model_config.get('sequence_length', 313)
+                    input_size = seq_length * bits
+                    print(f"Estimating dimensions: sequence_length={seq_length}, input_size={input_size}")
+                    model.vector_projection = nn.Linear(input_size, model.embed_dim).to(device)
+    elif 'nanni_att' in model_type:
+        model = nanni_att(
+            sequence_length=model_config.get('sequence_length', 313),
+            output_size=model_config.get('output_size', 16),
+            num_heads=model_config.get('num_heads', 8),
+            embed_dim=model_config.get('embed_dim', 64),
+            hidden_size=model_config.get('hidden_size', 100),
+            
         )
     elif 'enhanced_mlp' in model_type or 'enhancedmlp' in model_type:
         model = EnhancedMLP(
@@ -247,7 +288,8 @@ def predict_sequence(sequence: str, model_path: str):
                     bits = int(encoding_type.split('_')[1])
                 except:
                     pass
-                    
+            
+            expected_input_size = None        
             # For models that have input_size attribute
             if hasattr(model, 'input_size'):
                 expected_input_size = model.input_size
