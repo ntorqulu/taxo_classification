@@ -110,7 +110,7 @@ def load_model(checkpoint_path):
                     except:
                         pass
                         
-                # IMPORTANT: Extract the exact input size from the checkpoint
+                # Extract the exact input size from the checkpoint
                 if 'model_state_dict' in checkpoint and 'vector_projection.weight' in checkpoint['model_state_dict']:
                     vector_proj_weight = checkpoint['model_state_dict']['vector_projection.weight']
                     actual_input_size = vector_proj_weight.shape[1]  # Get exact input dimension
@@ -118,7 +118,7 @@ def load_model(checkpoint_path):
                     
                     print(f"Using exact dimensions from checkpoint: input_size={actual_input_size}, embed_dim={embed_dim}")
                     
-                    # Pre-initialize with EXACT dimensions from checkpoint
+                    # Pre-initialize with dimensions from checkpoint
                     model.vector_projection = nn.Linear(actual_input_size, embed_dim).to(device)
                 else:
                     # Fallback to estimation if weight not found (shouldn't happen)
