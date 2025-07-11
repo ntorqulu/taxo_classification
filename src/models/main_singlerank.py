@@ -200,7 +200,7 @@ def run_experiment(hparams: dict) -> dict:
                 "weight": checkpoint["model_state_dict"]["conv1.weight"],
                 "bias": checkpoint["model_state_dict"]["conv1.bias"]
                 }
-            model.conv1.load_state_dict(new_state_dict)
+            model.conv1.load_state_dict(new_state_dict_conv1)
             new_state_dict_conv2 = {
                 "weight": checkpoint["model_state_dict"]["conv2.weight"],
                 "bias": checkpoint["model_state_dict"]["conv2.bias"]
