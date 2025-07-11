@@ -1,0 +1,36 @@
+{
+  "parquets_path": "",
+  "dataset_name": "all_ranks",
+  "max_rows": 1.0,
+  "seed": 123,
+  "epochs": 30,
+  "batch_size": 32,
+  "learning_rate": 0.0001,
+  "weight_decay": 1e-5,
+  "label_column_name": "order_name",
+  "k": null,
+  "bits": 0,
+  
+  "model_type": "bert",
+  "balancing_method": "none",
+  "optimizer": "adam",
+  "use_scheduler": true,
+  "scheduler": "cosine",
+  "scheduler_patience": 3,
+  "scheduler_factor": 0.5,
+  "patience": 5,
+  
+  "vocab_size": 4,
+  "max_length": 313,
+  "hidden_size": 128,
+  "num_layers": 3,
+  "num_heads": 4,
+  "dropout": 0.2,
+  "classifier_hidden_size": 128,
+
+  "experiment_id": "bert_order_classification",
+  "log_file": true,
+  "min_cardinality_filters": {
+        "order_name": 40
+  }
+} 
