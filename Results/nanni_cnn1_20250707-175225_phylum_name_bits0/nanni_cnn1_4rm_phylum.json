@@ -1,0 +1,30 @@
+{
+    "parquets_path": "",
+    "dataset_name": "all_ranks",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 20,
+    "batch_size": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 0,
+    "label_column_name": "phylum_name",
+    "min_cardinality_filters": {
+      "phylum_name": 40
+  },
+    "k": null,
+    "bits": 0, 
+    "hidden_size": 8,
+    
+    "model_type": "nanni_cnn1",
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "by_step",
+    "every_n_epochs": 50,
+
+    "seq_len_filter": 313,
+    
+    "dropout": 0.5,
+    "use_batch_norm": true,
+    "fast_mode": false
+
+  }
