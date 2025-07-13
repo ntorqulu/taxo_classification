@@ -31,7 +31,7 @@
 
   "fast_mode": false,
   "seq_len_filter": 313,
-  "min_cardinality_filters":  {"species_name": 10},
+  "min_cardinality_filters":  {"species_name": 40},
 
   "log_file": true
 }

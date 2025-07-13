@@ -7,7 +7,7 @@
   "batch_size": 64,
   "learning_rate": 0.001,
   "weight_decay": 1e-5,
-  "label_column_name": "species_name",
+  "label_column_name": "order_name",
   "k": null,
   "bits": 0,
   "hidden_size": null,
@@ -31,7 +31,7 @@
 
   "fast_mode": false,
   "seq_len_filter": 313,
-  "min_cardinality_filters":  {"species_name": 10},
+  "min_cardinality_filters":  {"order_name": 40},
 
   "log_file": true
 }
