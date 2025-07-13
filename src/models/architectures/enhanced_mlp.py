@@ -59,6 +59,59 @@ class EnhancedMLP(BaseModel):
         self.model = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Handle 4-row encoding input - flatten if needed
+        if x.dim() > 2:
+            x = x.view(x.size(0), -1)  # Flatten to [batch_size, features]
+        
+        # Handle input size mismatch dynamically
+        if x.size(1) != self.input_size:
+            # Get the actual input size
+            actual_input_size = x.size(1)
+            
+            # Rebuild the first layer with correct input size
+            first_layer_output_size = self.hidden_sizes[0]
+            new_first_layer = nn.Linear(actual_input_size, first_layer_output_size)
+            new_first_layer.to(x.device)
+            
+            # Rebuild the entire model with correct input size
+            layers = []
+            layers.append(new_first_layer)
+            
+            # Add batch norm if requested
+            if self.use_batch_norm:
+                layers.append(nn.BatchNorm1d(first_layer_output_size))
+                
+            # Add activation
+            layers.append(nn.ReLU())
+            
+            # Add dropout
+            if self.dropout > 0:
+                layers.append(nn.Dropout(self.dropout))
+            
+            # Add remaining hidden layers
+            prev_size = first_layer_output_size
+            for i, size in enumerate(self.hidden_sizes[1:], 1):
+                layers.append(nn.Linear(prev_size, size))
+                
+                if self.use_batch_norm:
+                    layers.append(nn.BatchNorm1d(size))
+                    
+                layers.append(nn.ReLU())
+                
+                if self.dropout > 0:
+                    layers.append(nn.Dropout(self.dropout))
+                    
+                prev_size = size
+            
+            # Add output layer
+            layers.append(nn.Linear(prev_size, self.output_size))
+            
+            # Replace the model
+            self.model = nn.Sequential(*layers)
+            self.input_size = actual_input_size
+            
+            print(f"Enhanced MLP: Adjusted input size from {self.input_size} to {actual_input_size}")
+        
         return self.model(x)
     
     def get_config(self) -> Dict[str, Any]:

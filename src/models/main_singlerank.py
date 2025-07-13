@@ -137,6 +137,18 @@ def run_experiment(hparams: dict) -> dict:
         model_params["hidden_size"] = hparams.get("hidden_size", taxo_data_loaders.data_length // 2)
 
     elif hparams.get("model_type") == "enhanced_mlp":
+        # For enhanced_mlp, calculate correct input size based on encoding
+        data_length = taxo_data_loaders.data_length
+        
+        # If using 4-row encoding (bits=0), multiply by 4
+        if hparams.get("bits", 0) == 0:
+            # 4-row encoding: [4, sequence_length] flattened = 4 * sequence_length
+            calculated_input_size = 4 * hparams.get("seq_len_filter", 313)
+        else:
+            # Other encodings use the data_length directly
+            calculated_input_size = data_length
+        
+        model_params["input_size"] = calculated_input_size
         model_params["hidden_sizes"] = hparams.get("hidden_sizes", [256, 128])
         model_params["dropout"] = hparams.get("dropout", 0.2)
         model_params["use_batch_norm"] = hparams.get("use_batch_norm", True)
