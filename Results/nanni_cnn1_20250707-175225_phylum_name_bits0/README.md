@@ -1,4 +1,4 @@
-# nanni_cnn1 4 row matrix kingdom level
+# nanni_cnn1 4 row matrix phylum level
 
 architecture: nanni_cnn1
 

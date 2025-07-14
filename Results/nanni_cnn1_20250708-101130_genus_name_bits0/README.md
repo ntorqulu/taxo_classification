@@ -1,4 +1,4 @@
-# nanni_cnn1 4 row matrix class level
+# nanni_cnn1 4 row matrix genus level
 
 architecture: nanni_cnn1
 
