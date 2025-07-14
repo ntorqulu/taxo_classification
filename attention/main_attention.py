@@ -1,5 +1,4 @@
 import argparse
-import json
 import time
 
 import numpy as np
@@ -7,8 +6,7 @@ import torch
 from compute_attention import compute_attention_by_predicted_class, compute_attention_of_a_sequence
 from dataset.cached_dataframe import CachedDataFrame
 from dataset.taxo_dataloaders import TaxoDataLoaders
-from dataset.utils import get_base_parquets_path, info, warn
-from torch.optim.optimizer import required
+from dataset.utils import info, warn
 
 
 def init_device(seed: int = 42) -> torch.device:
