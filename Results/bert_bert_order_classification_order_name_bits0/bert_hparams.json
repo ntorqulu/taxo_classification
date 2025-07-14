@@ -3,7 +3,7 @@
   "dataset_name": "all_ranks",
   "max_rows": 1.0,
   "seed": 123,
-  "epochs": 30,
+  "epochs": 20,
   "batch_size": 32,
   "learning_rate": 0.0001,
   "weight_decay": 1e-5,
