@@ -16,6 +16,8 @@ COPY data ./data
 # Copy application files
 COPY dna_predictor_app ./dna_predictor_app
 
+COPY Results ./Results
+
 WORKDIR /app/dna_predictor_app
 
 EXPOSE 5000
