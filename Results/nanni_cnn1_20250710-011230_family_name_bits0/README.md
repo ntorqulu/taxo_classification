@@ -1,4 +1,4 @@
-# nanni_cnn1 4 row matrix class level increasing the hidden size from 8 to 100
+# nanni_cnn1 4 row matrix family level increasing the hidden size from 8 to 100
 
 architecture: nanni_cnn1
 

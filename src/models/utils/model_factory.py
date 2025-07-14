@@ -46,8 +46,12 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
     elif model_type == "enhanced_mlp":
         required_params = ["input_size", "output_size"]
         _check_required_params(required_params, kwargs)
+        
+        # For 4-row encoding, input_size should be 4 * sequence_length
+        input_size = kwargs["input_size"]
+        
         return EnhancedMLP(
-            input_size=kwargs["input_size"],
+            input_size=input_size,
             hidden_sizes=kwargs.get("hidden_sizes", [256, 128]),
             output_size=kwargs["output_size"],
             dropout=kwargs.get("dropout", 0.2),

@@ -1,0 +1,37 @@
+{
+  "parquets_path": "",
+  "dataset_name": "all_ranks",
+  "max_rows": 1.0,
+  "seed": 123,
+  "epochs": 20,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "weight_decay": 1e-5,
+  "label_column_name": "phylum_name",
+  "k": null,
+  "bits": 0,
+  "hidden_size": null,
+  
+  "model_type": "enhanced_mlp",
+  "balancing_method": "none",
+  "optimizer": "adam",
+  "use_scheduler": true,
+  "scheduler": "plateau",
+  "scheduler_patience": 3,
+  "scheduler_factor": 0.5,
+  "patience": 5,
+  
+  "hidden_sizes": [256, 128],
+  "dropout": 0.2,
+  "use_batch_norm": true,
+  
+  "kernel_sizes": [3, 5, 7],
+  "num_filters": [64, 128, 256],
+  "fc_sizes": [512, 256],
+
+  "fast_mode": false,
+  "seq_len_filter": 313,
+  "min_cardinality_filters":  {"phylum_name": 40},
+
+  "log_file": true
+}

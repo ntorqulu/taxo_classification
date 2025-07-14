@@ -272,7 +272,7 @@ Supported architectures:
 - **Variants:**
   - **Nanni CNN1:** Compact CNN for efficient modeling.
   - **Nanni CNN2:** Deeper CNN with more filters and layers.
-  - **Nanni Attention Models:** CNNs with attention mechanisms for interpretability and accuracy.
+  - **Nanni Attention Models:** Hybrid self-attention and BiLSTM for interpretability and accuracy.
 - **Features:** Fixed kernel sizes, dropout, and attention layers (for attention models).
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
 
@@ -380,6 +380,7 @@ PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/
 - `bert`
 
 **Key config parameters (singlerank):**
+
 | Parameter              | Type        | Description |
 |------------------------|-------------|-------------|
 | parquets_path          | str         | Path to data parquets (default: auto) |
@@ -441,6 +442,7 @@ PYTHONPATH=$(pwd)/src/ python src/models/main_multirank.py --config src/models/h
 - `gnn_hierarchical`
 
 **Key config parameters (multirank):**
+
 | Parameter              | Type        | Description |
 |------------------------|-------------|-------------|
 | parquets_path          | str         | Path to data parquets (default: auto) |
