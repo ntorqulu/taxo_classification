@@ -1,9 +1,11 @@
 import os
-from pathlib import Path
-import torch
 import re
+from pathlib import Path
+
+import torch
 
 CHECKPOINTS_DIR = Path("../Results")  # Adjust path as needed
+
 
 def list_models():
     """Scan checkpoints directory for available models (only *best.pt in each subdir, display folder name as display_name)."""
@@ -15,54 +17,57 @@ def list_models():
         if not model_dir.is_dir():
             continue
         # Only consider *best.pt files
-        best_files = list(model_dir.glob('*best.pt'))
+        best_files = list(model_dir.glob("*best.pt"))
         if not best_files:
             continue
         best_file = best_files[0]  # If multiple, just take the first
         folder = model_dir.name
 
         # Obtaint the model title
-        readme_file = model_dir / 'README.md'
+        readme_file = model_dir / "README.md"
         display_name = None
         if readme_file.exists():
             first_line = readme_file.read_text().splitlines()[0]
-            if first_line.startswith('#'):
+            if first_line.startswith("#"):
                 display_name = first_line[1:].strip()
 
         if not display_name:
-            display_name = folder.replace('_', ' ')
+            display_name = folder.replace("_", " ")
 
         try:
-            checkpoint = torch.load(best_file, map_location='cpu')
-            config = checkpoint.get('model_config', {})
-            model_type = config.get('model_type', '')
-            rank = config.get('label_column_name', '')
+            checkpoint = torch.load(best_file, map_location="cpu", weights_only=False)
+            config = checkpoint.get("model_config", {})
+            model_type = config.get("model_type", "")
+            rank = config.get("label_column_name", "")
             # Encoding logic based on folder name
-            if folder.endswith('bits0'):
-                encoding = '4row'
+            if folder.endswith("bits0"):
+                encoding = "4row"
             # Use regex to match _k{number} pattern for k-mer encoding
-            elif re.search(r'_k(\d+)$', folder):
-                k_value = re.search(r'_k(\d+)$', folder).group(1)
-                encoding = f'kmer_{k_value}'
+            elif re.search(r"_k(\d+)$", folder):
+                k_value = re.search(r"_k(\d+)$", folder).group(1)
+                encoding = f"kmer_{k_value}"
             # Use regex to match _bits{number} pattern for bits encoding
-            elif re.search(r'_bits(\d+)$', folder):
-                bits_value = re.search(r'_bits(\d+)$', folder).group(1)
-                encoding = f'bits_{bits_value}'
-            elif '4row' in folder:
-                encoding = '4row'
+            elif re.search(r"_bits(\d+)$", folder):
+                bits_value = re.search(r"_bits(\d+)$", folder).group(1)
+                encoding = f"bits_{bits_value}"
+            elif "4row" in folder:
+                encoding = "4row"
             else:
                 encoding = folder
-            models.append({
-                "name": folder,
-                "path": str(best_file),
-                "model_type": model_type,
-                "rank": rank,
-                "encoding": encoding,
-                "display_name": display_name,
-            })
+            models.append(
+                {
+                    "name": folder,
+                    "path": str(best_file),
+                    "model_type": model_type,
+                    "rank": rank,
+                    "encoding": encoding,
+                    "display_name": display_name,
+                }
+            )
         except Exception as e:
             print(f"Error parsing model directory {model_dir}: {e}")
     return models
+
 
 def get_encodings():
     """Return available encodings based on available models."""
@@ -70,11 +75,13 @@ def get_encodings():
     encodings = list(set([m["encoding"] for m in models]))
     return encodings
 
+
 def get_ranks():
     """Return available taxonomic ranks based on available models."""
     models = list_models()
     ranks = list(set([m["rank"] for m in models]))
     return ranks
+
 
 def get_model_by_name(model_name):
     """Get model configuration by name."""
@@ -84,24 +91,25 @@ def get_model_by_name(model_name):
             return model
     return None
 
+
 # Add this function to model_utils.py
 def get_model_hyperparameters(model_dir):
     """Get hyperparameters from JSON file in model directory."""
     import json
-    
+
     model_dir = Path(model_dir)
     hparams = {}
-    
+
     # Look for JSON files in the model directory
     json_files = list(model_dir.glob("*.json"))
-    
+
     if json_files:
         try:
             # Use the first JSON file found
-            with open(json_files[0], 'r') as f:
+            with open(json_files[0], "r") as f:
                 hparams = json.load(f)
             return hparams
         except Exception as e:
             print(f"Error loading hyperparameters: {e}")
-    
+
     return hparams
