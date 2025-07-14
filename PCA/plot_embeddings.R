@@ -19,8 +19,8 @@ level_name <- opt$level
 output_plot <- opt$output_plot
 
 # input_table <- "PCA/embeddings.tsv"  # Default value for input_table
-# level_name <- "genus_name"            # Default value for level_name
-# output_plot <- "PCA/pca_plot.png"     # Default value for output_plot
+# level_name <- "order_name"            # Default value for level_name
+# output_plot <- paste0("PCA/",gsub("_name","",level_name),".png")     # Default value for output_plot
 
 df <- read.table(input_table, header = TRUE, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
 if (ncol(df) == 1) {
@@ -80,7 +80,9 @@ p <- ggplot(df, aes_string(x = pca_columns[1], y = pca_columns_2[1])) +
          x = pca_columns[1],
          y = pca_columns_2[1]) +
     theme_minimal() +
-    theme(legend.position = "right")
-
+    theme(legend.position = "right",
+          plot.background = element_rect(color = "white") )
+    
 print(p)
+
 ggsave(output_plot, p, width = 10, height = 8)
