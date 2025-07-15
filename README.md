@@ -255,7 +255,7 @@ Supported architectures:
 **Overview**  
 The Enhanced Multi-Layer Perceptron (Enhaced MLP) is a more complex version of the standard fully connected neural network, designed for taxonomic classification.
 
-**Architecture Details** 
+**Architecture Details**  
 The Enhanced MLP is implemented in [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py) and features:
 
 ```
@@ -268,28 +268,23 @@ class EnhancedMLP(BaseModel):
                 use_batch_norm: bool = True):
 ```
 
-**Key Components** 
+**Key Components**  
 1. Configurable Hidden Layers: Variable number of hidden layers with customizable sizes.
 2. Batch normalization: Applied after each linear layer to stabilize training.
 3. ReLU Activation: Non-linear activation function between layers.
 4. Dropout Regularization: Prevents overfitting during training.
 5. Flexible Input Handling: Adapts to different input dimensions.
 
-**Layer Architecture** 
-//image
-```
-Input → Linear → BatchNorm → ReLU → Dropout → 
-       Linear → BatchNorm → ReLU → Dropout → 
-       ... (repeat for each hidden layer) → 
-       Linear (Output)
-```
-**DNA Encoding Adaptation** 
+**Layer Architecture**  
+<img width="377" height="606" alt="Screenshot 2025-07-16 at 01 23 42" src="https://github.com/user-attachments/assets/684f1b93-47ba-4ae6-b928-0c9600a42b70" />
+
+**DNA Encoding Adaptation**  
 The Enhanced MLP is desinged to handle the three DNA encoding methods implemented in this project:
 - kmer encoding
 - one-hot/bit encoding
 - 4 row matrix encoding
 
-**Dynamic Input Size** 
+**Dynamic Input Size**  
 It has the hability to dynamically adapt to different input sizes in order to handle the different encodings.
 
 ```
@@ -307,7 +302,7 @@ def forward(self, x: torch.Tensor) -> torch.Tensor:
 
 This way, there is no need to specify the exact input dimension before training.
 
-**Training Parameters** 
+**Training Parameters**  
 It has been trained with the following architecture parameters:
 
 ```
