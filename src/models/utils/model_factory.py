@@ -11,6 +11,7 @@ from models.architectures.cascade_hierarchical_model import CascadeHierarchicalM
 from models.architectures.hierarchical_model import HierarchicalModel
 from models.architectures.gnn_hierarchical_model import GNNHierarchicalModel
 from models.architectures.bert_model import BERTTaxoModel
+from models.architectures.connected_model import ConnectedModel
 
 
 def create_model(model_type: str, **kwargs) -> BaseModel:
@@ -24,7 +25,18 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
     Returns:
         Instantiated model
     """
-    if model_type == "basic":
+    if model_type == "connected":
+        models = kwargs.get("models")
+        return ConnectedModel(
+            input_size=kwargs.get("input_size"),
+            output_size=kwargs.get("output_size"),
+            hidden_size=kwargs.get("hidden_size"),
+            models=models,
+            dropout=kwargs.get("dropout", 0.5),
+            connected_type=kwargs.get("connected_type"),
+            connected_models=kwargs.get("connected_models")
+        )
+    elif model_type == "basic":
         # Get required parameters
         input_size = kwargs.get("input_size")
         output_size = kwargs.get("output_size")
@@ -193,7 +205,6 @@ def create_model(model_type: str, **kwargs) -> BaseModel:
             classifier_hidden_size=kwargs.get("classifier_hidden_size", 256),
             name=kwargs.get("name", "BERTTaxoModel"),
         )
-
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 

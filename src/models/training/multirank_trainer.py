@@ -6,10 +6,10 @@ from typing import Dict, Any, List, Tuple, Optional, Union
 import os
 import time
 from torch.utils.tensorboard import SummaryWriter
-from src.dataset.utils import info
+from dataset.utils import info
 
-from src.models.architectures.hierarchical_model import HierarchicalLoss, HierarchicalAccuracy
-from src.constants.taxonomy_labels import TAXONOMY_LEVELS
+from models.architectures.hierarchical_model import HierarchicalLoss, HierarchicalAccuracy
+from constants.taxonomy_labels import TAXONOMY_LEVELS
 
 
 class HierarchicalTrainer:

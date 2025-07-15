@@ -179,12 +179,46 @@ def run_experiment(hparams: dict) -> dict:
         model_params["dropout"] = hparams.get("dropout", 0.3)
         model_params["classifier_hidden_size"] = hparams.get("classifier_hidden_size", 256)
 
+    elif hparams.get("model_type") == "connected":
+        model_params["connected_models"] = hparams.get("connected_models", 5)
+        model_params["connected_type"] = hparams.get("connected_type", 5)
+        model_params["hidden_size"] = hparams.get("hidden_size", 256)
+
     # Add experiment identifier to model name
     exp_id = hparams.get("experiment_id", time.strftime("%Y%m%d-%H%M%S"))
     model_params["name"] = f"{hparams.get('model_type', 'basic')}_{exp_id}"
 
+    model_type = hparams.get("model_type", "basic")
+
     # Create model
-    model = create_model(model_type=hparams.get("model_type", "basic"), **model_params).to(device)
+    if model_type != "connected":
+        model = create_model(model_type=hparams.get("model_type", "basic"), **model_params).to(device)
+        info(f"Model type: {hparams.get('model_type', 'basic')}")
+    else:
+        connected_models = hparams.get("connected_models")
+        models: list[BaseModel] = list()
+        for level, level_model_type in connected_models.items():
+            # the definitive taxo_data_loader is the last one.
+            taxo_data_loaders = TaxoDataLoaders(
+                parquets_path=Path(parquets_path) / dataset_name,
+                label_column_name=level,
+                k=hparams["k"],
+                bits=hparams["bits"],
+                batch_size=hparams["batch_size"],
+                max_rows=hparams["max_rows"],
+                seq_len_filter=hparams.get("seq_len_filter", None),
+                min_cardinality_filters={level: 40},
+            )
+            if model_params["input_size"]:
+                assert model_params["input_size"] == taxo_data_loaders.data_length
+            model_params["input_size"] = taxo_data_loaders.data_length
+            model_params["output_size"] = taxo_data_loaders.num_labels
+            model_params["models_descripcions"] = hparams.get("connected_models")
+            model_params["connected_type"] = hparams.get("connected_type")
+            model = create_model(level_model_type, **model_params)
+            models.append(model)
+        model_params["models"] = models
+        model = create_model(model_type="connected", **model_params).to(device)
 
     if hparams.get("transfer_learning", False):
         from_checkpoint_path = hparams.get("from_checkpoint_path", None)

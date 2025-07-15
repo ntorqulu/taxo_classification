@@ -1,0 +1,38 @@
+{
+    "parquets_path": "",
+    "dataset_name": "all_ranks",
+    "max_rows": 1.0,
+    "seed": 123,
+    "epochs": 20,
+    "batch_size": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 0,
+    "label_column_name": "order_name",
+    "k": null,
+    "bits": 0,
+    "hidden_size": 200,
+
+    "model_type": "connected",
+    "connected_type": "densenet",
+    "connected_models": {
+      "kingdom_name" : "nanni_cnn2",
+      "phylum_name": "nanni_cnn2",
+      "class_name": "nanni_cnn2",
+      "order_name": "nanni_cnn2",
+      "family_name": "nanni_cnn2",
+      "genus_name": "nanni_cnn2"
+    },
+    "optimizer": "adam",
+    "use_scheduler": true,
+    "scheduler": "by_step",
+    "every_n_epochs": 50,
+
+    "seq_len_filter": 313,
+
+    "dropout": 0.5,
+    "use_batch_norm": true,
+    "fast_mode": false,
+    "eval_frequency": 5,
+
+    "log_file": true
+  }
