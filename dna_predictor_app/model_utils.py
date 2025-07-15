@@ -51,7 +51,6 @@ def list_models():
                     # Check file size - if very small, silently skip
                     file_size = best_file.stat().st_size if best_file.exists() else 0
                     if file_size < 1000:  # Very small file, likely corrupted
-                        print(f"Skipping corrupted file: {best_file}")
                         continue  # Silently skip corrupted files
                     
                     # Try alternative loading methods silently
