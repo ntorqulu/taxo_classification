@@ -322,10 +322,10 @@ It has been trained with the following architecture parameters:
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
 
 ### 5.4 BERT-based Model
-**Overview:** 
+**Overview:**  
 The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
 
-**Architecture Details:** 
+**Architecture Details:**  
 The BERT model is implemented in [`bert_model.py`](src/models/architectures/bert_model.py) and defined with:
 
 ```
@@ -342,7 +342,7 @@ class BERTTaxoModel(BaseModel):
                  name: str = "BERTTaxoModel"):
 ```
 
-**Key Components** 
+**Key Components**  
 1. Token Embedding: Converts DNA nucleotides (A, T, G, C) to dense vector representations.
 2. Positional Encoding: Adds sinusoidal position information to preserve sequence order.
 3. Multi-Head Self-Attention: Captures relationships between different positions in the sequence. Can relate nucleotides across the entire sequence, making each position attend to all other positions. This way, it can learn large sequence patterns.
@@ -351,23 +351,17 @@ class BERTTaxoModel(BaseModel):
 6. Classification Head: Multi-layer preceptron for final taxonomy prediction.
 7. Dropout Regularization: Prevents overfitting throughout the network.
 
-**Layer Architecture** 
-```
-Input (4-row) → Argmax → Token Embedding → Positional Encoding → 
-LayerNorm → Dropout → 
-Transformer Block 1 → Transformer Block 2 → ... → Transformer Block N → 
-Final LayerNorm → Global Average Pooling → 
-Classifier MLP → Output
-```
+**Layer Architecture**  
+<img width="1256" height="708" alt="Screenshot 2025-07-16 at 01 25 55" src="https://github.com/user-attachments/assets/fde35331-1c4d-4270-b7b8-77c228c887ad" />
 
-**DNA Encoding Adaptation** 
+**DNA Encoding Adaptation**  
 The model is specifically designed for 4 row matrix encoding only:
 - Input Format: 2D matrix (4, seq_length)
 - Processing: Converts the 4-row matrix to token IDs using argmax operation
 - Character Mapping: {'A': 0, 'T': 1, 'G': 2, 'C': 3}
 - Only trains with sequences of fixed length size 313 bps
 
-**Training Parameters** 
+**Training Parameters**  
 It has been trained with the following architecture parameters:
 
 ```
