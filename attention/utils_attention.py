@@ -112,7 +112,7 @@ def load_model(checkpoint_path):
 def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
     # Validate labels
 
-    info(f"Validating labels")
+    info("Validating labels")
     results = taxo_data_loaders.compare_label_values()
     for ds_name in results.keys():
         ds_results = results[ds_name]
@@ -156,7 +156,7 @@ def log_label_stats(taxo_data_loaders: TaxoDataLoaders):
     info(f"Filtered dataset - Max sequence length: {taxo_data_loaders.max_sequence_len}")
 
 
-def load_data(hparams: dict) -> TaxoDataLoaders:
+def load_data(hparams: dict, only_test: bool = False) -> TaxoDataLoaders:
     # Load data
     parquets_path = hparams["parquets_path"] if hparams["parquets_path"] else get_base_parquets_path()
     dataset_name = hparams["dataset_name"]
@@ -179,11 +179,14 @@ def load_data(hparams: dict) -> TaxoDataLoaders:
     log_label_stats(taxo_data_loaders)
     info("Level cardinalities:")
     CachedDataFrame.log_level_cardinalities()
-    combined_dataset = ConcatDataset(
-        [taxo_data_loaders.train_dataset, taxo_data_loaders.test_dataset, taxo_data_loaders.eval_dataset]
-    )
-    combined_loader = torch.utils.data.DataLoader(combined_dataset, batch_size=30, shuffle=True, num_workers=4)
-    return combined_loader
+    if only_test:
+        return taxo_data_loaders.test_loader
+    else:
+        combined_dataset = ConcatDataset(
+            [taxo_data_loaders.train_dataset, taxo_data_loaders.test_dataset, taxo_data_loaders.eval_dataset]
+        )
+        combined_loader = torch.utils.data.DataLoader(combined_dataset, batch_size=30, shuffle=True, num_workers=4)
+        return combined_loader
 
 
 def get_model_by_name(model_name):

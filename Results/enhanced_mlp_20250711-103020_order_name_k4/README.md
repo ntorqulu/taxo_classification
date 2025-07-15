@@ -1,8 +1,8 @@
-# DEMO_genus enhanced mlp k4 genus level
+# DEMO_order enhanced mlp k4 order level
 
 architecture: enhanced mlp
 
-level: genus
+level: order
 
 coding: k4
 
