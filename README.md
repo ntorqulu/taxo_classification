@@ -251,20 +251,70 @@ Three main approaches are implemented:
 
 Supported architectures:
 
-### 5.1 Fully Connected Neural Network (MLP)
-- **Fully Connected Neural Network (MLP):**  
-- **Files:** [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py), [`basic_model.py`](src/models/architectures/basic_model.py)
-- **Description:** Standard multi-layer perceptron for classification. Used as a baseline and for simple tasks.
-- **Features:** Configurable hidden layers, dropout, batch normalization (in enhanced MLP).
-- **Usage:** Suitable for one-hot/bit encoded or k-merized data.
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
-  
-### 5.2 Convolutional Neural Network (CNN)
-- **File:** [`cnn_model.py`](src/models/architectures/cnn_model.py)
-- **Description:** Standard CNN for extracting local sequence patterns. 
-- **Features:** Multiple convolutional layers, configurable kernel sizes and filter counts, followed by fully connected layers.
-- **Usage:** Best for 4×N matrix or one-hot encoded data.
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
+### 5.1 Enhanced Multi-Layer Perceptron (MLP)
+**Overview**  
+The Enhanced Multi-Layer Perceptron (Enhaced MLP) is a more complex version of the standard fully connected neural network, designed for taxonomic classification.
+
+**Architecture Details** 
+The Enhanced MLP is implemented in [`enhanced_mlp.py`](src/models/architectures/enhanced_mlp.py) and features:
+
+```
+class EnhancedMLP(BaseModel):
+    def __init__(self, 
+                input_size: int, 
+                hidden_sizes: List[int],
+                output_size: int, 
+                dropout: float = 0.2,
+                use_batch_norm: bool = True):
+```
+
+**Key Components** 
+1. Configurable Hidden Layers: Variable number of hidden layers with customizable sizes.
+2. Batch normalization: Applied after each linear layer to stabilize training.
+3. ReLU Activation: Non-linear activation function between layers.
+4. Dropout Regularization: Prevents overfitting during training.
+5. Flexible Input Handling: Adapts to different input dimensions.
+
+**Layer Architecture** 
+//image
+```
+Input → Linear → BatchNorm → ReLU → Dropout → 
+       Linear → BatchNorm → ReLU → Dropout → 
+       ... (repeat for each hidden layer) → 
+       Linear (Output)
+```
+**DNA Encoding Adaptation** 
+The Enhanced MLP is desinged to handle the three DNA encoding methods implemented in this project:
+- kmer encoding
+- one-hot/bit encoding
+- 4 row matrix encoding
+
+**Dynamic Input Size** 
+It has the hability to dynamically adapt to different input sizes in order to handle the different encodings.
+
+```
+def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # Handle 4-row encoding input - flatten if needed
+    if x.dim() > 2:
+        x = x.view(x.size(0), -1)  # Flatten to [batch_size, features]
+    
+    # Handle input size mismatch dynamically
+    if x.size(1) != self.input_size:
+        # Rebuild the first layer with correct input size
+        actual_input_size = x.size(1)
+        # ... rebuild network with correct dimensions
+```
+
+This way, there is no need to specify the exact input dimension before training.
+
+**Training Parameters** 
+It has been trained with the following architecture parameters:
+
+```
+"hidden_sizes": [512, 256, 128],
+"dropout": 0.3,
+"use_batch_norm": true
+```
   
 ### 5.3 Nanni CNN Variants
 - **File:** [`nanni2024.py`](src/models/architectures/nanni2024.py)
@@ -277,24 +327,65 @@ Supported architectures:
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
 
 ### 5.4 BERT-based Model
-- **File:** [`bert_model.py`](src/models/architectures/bert_model.py)
-- **Description:** Transformer-based model for sequence modeling, inspired by BERT.
-- **Features:** Multi-head self-attention, positional encoding, deep transformer layers.
-- **Usage:** Suitable for long-range dependencies in DNA sequences.
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
+**Overview:** 
+The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
 
-- **Files:** [`hierarchical_model.py`](src/models/architectures/hierarchical_model.py), [`cascade_hierarchical_model.py`](src/models/architectures/cascade_hierarchical_model.py)
-- **Description:** Models for multi-rank (hierarchical) classification, predicting multiple taxonomic levels simultaneously.
-- **Features:** Shared and level-specific layers, cascade loss, confidence weighting.
-- **Usage:** Used for hierarchical datasets (all_ranks or filtered_ranks).
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
+**Architecture Details:** 
+The BERT model is implemented in [`bert_model.py`](src/models/architectures/bert_model.py) and defined with:
 
-### 6.6 Graph Neural Network (GNN)
-- **File:** [`gnn_hierarchical_model.py`](src/models/architectures/gnn_hierarchical_model.py)
-- **Description:** GNN for modeling relationships between taxonomic levels.
-- **Features:** Multiple GNN layers, optional attention, graph and consistency loss.
-- **Usage:** For advanced hierarchical classification tasks.
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/multirank/`](src/models/hyperparams/multirank/).
+```
+class BERTTaxoModel(BaseModel):
+    def __init__(self, 
+                 vocab_size: int = 4,  # A, T, G, C
+                 max_length: int = 313,
+                 hidden_size: int = 128,
+                 num_layers: int = 3,
+                 num_heads: int = 4,
+                 dropout: float = 0.2,
+                 output_size: Optional[int] = None,
+                 classifier_hidden_size: int = 128,
+                 name: str = "BERTTaxoModel"):
+```
+
+**Key Components** 
+1. Token Embedding: Converts DNA nucleotides (A, T, G, C) to dense vector representations.
+2. Positional Encoding: Adds sinusoidal position information to preserve sequence order.
+3. Multi-Head Self-Attention: Captures relationships between different positions in the sequence. Can relate nucleotides across the entire sequence, making each position attend to all other positions. This way, it can learn large sequence patterns.
+4. Transformer Encoder Layers: Stack of transformer blocks for deep feature extraction.
+5. Layer Normalization: Applied before and after attention and feed-forward layers.
+6. Classification Head: Multi-layer preceptron for final taxonomy prediction.
+7. Dropout Regularization: Prevents overfitting throughout the network.
+
+**Layer Architecture** 
+```
+Input (4-row) → Argmax → Token Embedding → Positional Encoding → 
+LayerNorm → Dropout → 
+Transformer Block 1 → Transformer Block 2 → ... → Transformer Block N → 
+Final LayerNorm → Global Average Pooling → 
+Classifier MLP → Output
+```
+
+**DNA Encoding Adaptation** 
+The model is specifically designed for 4 row matrix encoding only:
+- Input Format: 2D matrix (4, seq_length)
+- Processing: Converts the 4-row matrix to token IDs using argmax operation
+- Character Mapping: {'A': 0, 'T': 1, 'G': 2, 'C': 3}
+- Only trains with sequences of fixed length size 313 bps
+
+**Training Parameters** 
+It has been trained with the following architecture parameters:
+
+```
+{
+  "vocab_size": 4,                       // DNA nucleotide vocabulary size
+  "max_length": 313,                     // Maximum sequence length
+  "hidden_size": 128,                    // Hidden dimension size
+  "num_layers": 3,                       // Number of transformer layers
+  "num_heads": 4,                        // Number of attention heads
+  "dropout": 0.2,                        // Dropout probability
+  "classifier_hidden_size": 128,         // Classification head hidden size
+}
+```
 
 **Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
