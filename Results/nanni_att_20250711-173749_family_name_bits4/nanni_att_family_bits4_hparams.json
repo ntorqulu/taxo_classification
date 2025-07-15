@@ -1,0 +1,31 @@
+{
+  "parquets_path": "",
+  "dataset_name": "all_ranks",
+  "max_rows": 1.0,
+  "seed": 123,
+  "epochs": 20,
+  "batch_size": 30,
+  "learning_rate": 0.001,
+  "weight_decay": 0,
+  "label_column_name": "family_name",
+  "k": null,
+  "bits": 4,
+  "hidden_size": 100,
+
+  "model_type": "nanni_att",
+  "optimizer": "adam",
+  "use_scheduler": true,
+  "scheduler": "by_step",
+  "every_n_epochs": 50,
+  "min_cardinality_filters": {
+    "family_name": 40
+  },
+  "seq_len_filter": 313,
+  "dropout": 0.5,
+  "use_batch_norm": true,
+  "fast_mode": false,
+  "eval_frequency": 5,
+
+  "num_heads": 8,
+  "embed_dim": 64
+}
