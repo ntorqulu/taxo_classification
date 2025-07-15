@@ -1,4 +1,4 @@
-# enhanced mlp k4 genus level
+# DEMO_genus enhanced mlp k4 genus level
 
 architecture: enhanced mlp
 
