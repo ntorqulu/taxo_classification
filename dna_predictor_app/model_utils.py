@@ -13,32 +13,69 @@ def list_models():
     if not CHECKPOINTS_DIR.exists():
         print(f"Warning: Checkpoints directory {CHECKPOINTS_DIR} not found.")
         return models
+    
     for model_dir in CHECKPOINTS_DIR.iterdir():
         if not model_dir.is_dir():
             continue
+            
         # Only consider *best.pt files
         best_files = list(model_dir.glob("*best.pt"))
         if not best_files:
             continue
+            
         best_file = best_files[0]  # If multiple, just take the first
         folder = model_dir.name
 
-        # Obtaint the model title
+        # Get the model title from README
         readme_file = model_dir / "README.md"
         display_name = None
         if readme_file.exists():
-            first_line = readme_file.read_text().splitlines()[0]
-            if first_line.startswith("#"):
-                display_name = first_line[1:].strip()
+            try:
+                first_line = readme_file.read_text().splitlines()[0]
+                if first_line.startswith("#"):
+                    display_name = first_line[1:].strip()
+            except Exception:
+                pass  # Silently skip README reading errors
 
         if not display_name:
             display_name = folder.replace("_", " ")
 
         try:
-            checkpoint = torch.load(best_file, map_location="cpu", weights_only=False)
+            # Load checkpoint with silent error handling
+            checkpoint = None
+            try:
+                checkpoint = torch.load(best_file, map_location="cpu", weights_only=False)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "invalid load key" in error_msg or "unsupported operand" in error_msg:
+                    # Check file size - if very small, silently skip
+                    file_size = best_file.stat().st_size if best_file.exists() else 0
+                    if file_size < 1000:  # Very small file, likely corrupted
+                        print(f"Skipping corrupted file: {best_file}")
+                        continue  # Silently skip corrupted files
+                    
+                    # Try alternative loading methods silently
+                    try:
+                        checkpoint = torch.load(best_file, map_location="cpu", weights_only=True)
+                    except Exception:
+                        continue  # Silently skip if alternative loading fails
+                else:
+                    continue  # Silently skip other loading errors
+
+            # Validate checkpoint structure
+            if not isinstance(checkpoint, dict):
+                continue  # Silently skip invalid checkpoint formats
+            
+            # Extract model configuration
             config = checkpoint.get("model_config", {})
             model_type = config.get("model_type", "")
             rank = config.get("label_column_name", "")
+            
+            # Handle case where checkpoint is directly a state dict
+            if not config and any('weight' in k or 'bias' in k for k in checkpoint.keys()):
+                model_type = "unknown"
+                rank = "unknown"
+            
             # Encoding logic based on folder name
             if folder.endswith("bits0"):
                 encoding = "4row"
@@ -54,18 +91,20 @@ def list_models():
                 encoding = "4row"
             else:
                 encoding = folder
-            models.append(
-                {
-                    "name": folder,
-                    "path": str(best_file),
-                    "model_type": model_type,
-                    "rank": rank,
-                    "encoding": encoding,
-                    "display_name": display_name,
-                }
-            )
-        except Exception as e:
-            print(f"Error parsing model directory {model_dir}: {e}")
+
+            models.append({
+                "name": folder,
+                "path": str(best_file),
+                "model_type": model_type,
+                "rank": rank,
+                "encoding": encoding,
+                "display_name": display_name,
+            })
+            
+        except Exception:
+            # Silently skip any parsing errors
+            continue
+    
     return models
 
 

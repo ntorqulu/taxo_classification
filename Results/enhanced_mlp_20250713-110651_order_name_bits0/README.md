@@ -1,10 +1,10 @@
-# order enhanced mlp k4 order level
+# DEMO_order enhanced mlp 4 row matrix order level
 
 architecture: enhanced mlp
 
 level: order
 
-coding: k4
+coding: 4row
 
 command used:
 
