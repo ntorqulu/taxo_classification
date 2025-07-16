@@ -505,7 +505,7 @@ Residual Network or ResNet (`resnet`)
     x2 = net2(x1) + x1
     x3 = net3(x2) + x2
 
-Recurrent refinement (`recurrent`):
+Recurrent refinement (`recurrent`). Note that recurrent is the same as iterative, but the network remains the same type at each step.":
 
     x = net(x0)
     x1 = net(concat(x, x0))
