@@ -311,22 +311,17 @@ It has been trained with the following architecture parameters:
 "use_batch_norm": true
 ```
   
-### 5.2 Nanni CNN Variants
+### 5.3 Nanni CNN Variants
 - **File:** [`nanni2024.py`](src/models/architectures/nanni2024.py)
 - **Description:** Advanced CNNs inspired by Nanni et al. (2020, 2024), designed for DNA sequence classification.
 - **Variants:**
   - **Nanni CNN1:** Compact CNN for efficient modeling.
-  - **Nanni CNN2:** Deeper CNN with more filters and layers
-
+  - **Nanni CNN2:** Deeper CNN with more filters and layers.
   - **Nanni Attention Models:** Hybrid self-attention and BiLSTM for interpretability and accuracy.
 - **Features:** Fixed kernel sizes, dropout, and attention layers (for attention models).
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
-**Layer Architectures**  
 
-<img width="300" height="563" alt="Nanni Attention Model" src="https://github.com/user-attachments/assets/227c3f3b-dbd8-4a59-a56a-037deb695659" />
-<img width="1256" height="708"  alt="CNN1 and CNN2" src="https://github.com/user-attachments/assets/c0d63026-c6e4-4153-b783-3651dcdde3f1" />
-
-### 5.3 BERT-based Model
+### 5.4 BERT-based Model
 **Overview:**  
 The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
 
@@ -357,7 +352,7 @@ class BERTTaxoModel(BaseModel):
 7. Dropout Regularization: Prevents overfitting throughout the network.
 
 **Layer Architecture**  
-<img width="1256" height="708" alt="BERT-based Model Architecture" src="https://github.com/user-attachments/assets/fde35331-1c4d-4270-b7b8-77c228c887ad" />
+<img width="1256" height="708" alt="Screenshot 2025-07-16 at 01 25 55" src="https://github.com/user-attachments/assets/fde35331-1c4d-4270-b7b8-77c228c887ad" />
 
 **DNA Encoding Adaptation**  
 The model is specifically designed for 4 row matrix encoding only:
@@ -381,43 +376,6 @@ It has been trained with the following architecture parameters:
 }
 ```
 
-
-### 5.4 Connected Models
-- **File:** [`connected_model.py`]
-- **Description**: Different types of connected models. 
-- **Model types**:
-  - Iterative Fixed Input (`iterative`)   
- 
-         x = net1(x0)
-         x1 = net2(concat(x, x0))
-         x2 = net3(concat(x1, x0))
-         x3 = net4(concat(x2, x0))
-
-   - Densely Connected Convolutional Network or DenseNet (`densenet`)
- 
-         x1 = net1(x0)
-         x2 = net2(concat(x0, x1))
-         x3 = net3(concat(x0, x1, x2))
-
-   - Residual Network or ResNet (`resnet`)
-  
-         x1 = net1(x0) + x0
-         x2 = net2(x1) + x1
-         x3 = net3(x2) + x2
-
-   - Recurrent refinement (`recurrent`):
-
-         x = net(x0)
-         x1 = net(concat(x, x0))
-         x2 = net(concat(x1, x0))
-         x3 = net(concat(x2, x0))
-
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). For examples, 
-you can check `connected_hparams.json` and the parameters `model_type`, `connected_type`, and `connected_models`.
-
-**Layer Architectures**  
-<img width="1256" height="708" alt="Connected Models Architectures" src="https://github.com/user-attachments/assets/f39aed16-cf3a-47d9-8707-0b61ce4e958b" />
-
 **Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
 ---
@@ -425,7 +383,6 @@ you can check `connected_hparams.json` and the parameters `model_type`, `connect
 ## 6. Configuration and Hyperparameters
 
 **Code Reference:**  
-
 - [`src/models/hyperparams/`](src/models/hyperparams/)
 - [`src/models/main_singlerank.py`](src/models/main_singlerank.py)
 - [`src/models/main_multirank.py`](src/models/main_multirank.py)
@@ -441,8 +398,6 @@ Such JSON can have the following keys:
 
 - `batch_size`: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
 - `bits`: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
-- `connected_type`: str. Only for `model_type="connected"`. Specifies the type of connected model. Valid values are "iterative", "densenet", "resnet", and "recurrent".
-- `connected_models`: dict[str, str]. Only for `model_type="connected"`. Specifies the model to be used at each level. Each value must be one of the valid `model_type` options (currently only tested with "nanni_cnn2").
 - `dropout`: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
 - `epochs`: int, number of epochs to use in the training phase.
 - `eval_frequency`: int, How often to run full evaluation (epochs).
@@ -459,8 +414,7 @@ Such JSON can have the following keys:
 - `max_rows`: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
 - `min_cardinality_filters`: dict[str, int], dictionary with rank columns as keys and *minimum* cardinality as values.
 Only labels in each column with cardinality higher than the specified value will be used. In case of multiple labels, the order of the labels will be taken into account.
-- `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" 
-, "nanni_att" and "connected"
+- `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
 - `momentum`: float, momentum value for the SDG optimizer.
 - `num_filters`: int, List of filter counts for conv layers for the "cnn" model
 - `optimizer`: str, optimizer to be used. Options are "[adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam)" (default) "[sgd](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html)"
@@ -485,12 +439,12 @@ This project supports two main types of classification models: **Singlerank** (s
 
 ### 7.1. Single-rank Models
 
-**Run command:**
+** Run command:**
 ```bash
 PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/<your_config>.json
 ```
 
-**Example:**
+- Example:
   ```bash
   PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/kmer_hparams.json
   ```
@@ -624,14 +578,9 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 
 ---
 ## 11. Results
+TODO
+Checkout the Results folder.
 
-In the `Results` folder, you will find the trained models. In each subfolder, you'll find:
-
-- `*_best.pt`: the PyTorch checkpoint file.
-- `.json`: a file with the parameters used for training.
-- `.log`: a file with the log output during training.
-- `README.md`: a file with the commands used to train the model.
-- 
 ---
 
 ## 12. DNA Prediction App
