@@ -56,7 +56,6 @@ Here we propose Deep Learning models as a potential solution for such problem. W
 
 ---
 ## Project Structure
-TODO
 ```bash
 taxo_classification/
 ├── README.md
@@ -963,7 +962,6 @@ This project is licensed under the terms of the [MIT License](LICENSE).
 
 ## References
 
-TODO: Add more references
 - Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
 - Arias, P. M., Sadjadi, N., Safari, M., Gong, Z., Wang, A. T., Haurum, J. B., Zarubiieva, I., Steinke, D., Kari, L., Chang, A. X., Lowe, S. C., & Taylor, G. W. (2025). [BarcodeBERT: Transformers for Biodiversity Analysis](https://arxiv.org/abs/2311.02401)
 - [mkCOInr](https://github.com/meglecz/mkCOInr)
