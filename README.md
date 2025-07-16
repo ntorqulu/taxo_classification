@@ -376,6 +376,42 @@ It has been trained with the following architecture parameters:
 }
 ```
 
+
+### 5.6 Connected Models
+- **File:** [`connected_model.py`]
+- **Description**: Different types of connected models. 
+- **Model types**:
+  - Iterative Fixed Input (`iterative`)   
+ 
+         x = net1(x0)
+         x1 = net2(concat(x, x0))
+         x2 = net3(concat(x1, x0))
+         x3 = net4(concat(x2, x0))
+
+   - Densely Connected Convolutional Network or DenseNet (`densenet`)
+ 
+         x1 = net1(x0)
+         x2 = net2(concat(x0, x1))
+         x3 = net3(concat(x0, x1, x2))
+
+   - Residual Network or ResNet (`resnet`)
+  
+         x1 = net1(x0) + x0
+         x2 = net2(x1) + x1
+         x3 = net3(x2) + x2
+
+   - Recurrent refinement (`recurrent`):
+
+         x = net(x0)
+         x1 = net(concat(x, x0))
+         x2 = net(concat(x1, x0))
+         x3 = net(concat(x2, x0))
+
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). As an example you
+can check out `connected_hparams.json` and the parameters `model_type`, `connected_type` and `connected_models`
+
+
+
 **Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
 ---
@@ -398,6 +434,9 @@ Such JSON can have the following keys:
 
 - `batch_size`: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
 - `bits`: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
+- `connected_type`: str, Only for `model_type="connected". Connected type model. Valid values are "iterative", "densenet", "resnet", "recurrent""
+- `connected_models`: dict[str, str], Only for `model_type="connected"`. For each level, the model to be used. It can be any 
+of "model_type" parameter values (currently only tested for "nanni_cnn2").
 - `dropout`: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
 - `epochs`: int, number of epochs to use in the training phase.
 - `eval_frequency`: int, How often to run full evaluation (epochs).
@@ -414,7 +453,8 @@ Such JSON can have the following keys:
 - `max_rows`: float or int, if float, values between 0 and 1, proportion of sequences used for the experiment. If int, total max number of sequences to be used in the experiment
 - `min_cardinality_filters`: dict[str, int], dictionary with rank columns as keys and *minimum* cardinality as values.
 Only labels in each column with cardinality higher than the specified value will be used. In case of multiple labels, the order of the labels will be taken into account.
-- `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" and "nanni_att"
+- `model_type`: str, model name. Options: "basic" (default), "enhanced_mlp", "cnn", "nanni_cnn1", "nanni_cnn2" 
+, "nanni_att" and "connected"
 - `momentum`: float, momentum value for the SDG optimizer.
 - `num_filters`: int, List of filter counts for conv layers for the "cnn" model
 - `optimizer`: str, optimizer to be used. Options are "[adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam)" (default) "[sgd](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html)"
