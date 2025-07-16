@@ -382,15 +382,30 @@ class nanni_cnn2(BaseModel):
 
 #### 5.2.3 Nanni attention
 **Overview:**
-TODO
+This model combines multi-head self-attention, Bi-LSTMs and learnable attention pooling mecanism to generate.  
 
 **Architecture Details**
-The TODO model is defined in [nanni2024.py](https://github.com/ntorqulu/taxo_classification/blob/main/src/models/architectures/nanni2024.py) and defined with:
+The `nanni_att` is defined in [nanni2024.py](https://github.com/ntorqulu/taxo_classification/blob/main/src/models/architectures/nanni2024.py) and defined with:
 ```
-TODO
+class nanni_att(BaseModel):
+    def __init__(
+        self,
+        sequence_length: int,
+        output_size: int,
+        num_heads: int = 8,
+        embed_dim: int = 64,
+        hidden_size: int = 100,
+        batch_size: int = 30,
+        name: str = "nanni_att",
+    ):
 ```
 **Key Components**  
-1. TODO
+1. **Input projection**: converts sequences into fixed length embeddings (64).
+2. **Multi-Head Self-Attention**: allows each position of a sequence to see all the other positions to see what it must attend to. We compute it with 8 heads. Higlight global information.
+3. **BiLSTM**: It gives context to the order and the directionality. We compute it with `hidden_size == 100`.
+4. **Learnable attention pooling** Produces a single sequence-level representation of attention via softmax.
+5. **Batch normalization**: Normalizes the pooled output.
+6. **FC**: FC of `hidden_size=100` to output size.
 
 ### 5.3 BERT-based Model
 **Overview:**  
