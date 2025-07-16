@@ -331,6 +331,65 @@ It has been trained with the following architecture parameters:
 <img width="300" height="563" alt="Nanni Attention Model" src="https://github.com/user-attachments/assets/227c3f3b-dbd8-4a59-a56a-037deb695659" />
 <img width="1256" height="708"  alt="CNN1 and CNN2" src="https://github.com/user-attachments/assets/c0d63026-c6e4-4153-b783-3651dcdde3f1" />
 
+#### 5.2.1 Nanni CNN1
+**Overview:**
+This is the simplest model of the ones inspired by Nanni et al. (2024). The code was addapted from Matlab to pytorch and the parameters were keps as much as possible as in the original MS.
+
+**Architecture Details**
+The nanni_cnn1 model is defined in [nanni2024.py](https://github.com/ntorqulu/taxo_classification/blob/main/src/models/architectures/nanni2024.py) and defined with:
+```
+class nanni_cnn1(BaseModel):
+    def __init__(self,
+                 sequence_length: int,
+                 hidden_size: int,
+                 output_size: int,
+                 name: str = "nanni_cnn1"):
+```
+**Key Components**  
+1. Convolutional layer with 16 filters, kernel size 3 and padding = "same".
+2. Batch normalization 2D
+3. Dropout set at 0.5 of probability
+4. Fully connected NN with two layers. The hidden size was set to 8 as in the original MS
+
+**Training**
+Training was performed using the same parameters as in Nanni et al. (2024) but results clearly improved specially when increasing the hidden size of the Fully connected NN.
+
+#### 5.2.2 Nanni CNN2
+**Overview:**
+This model is an improvement of the previous model. This model adds a new convolutional layer and increase the complexity of the fully connected layer by adding an extra layer and increasing the hidden size.
+
+**Architecture Details**
+The nanni_cnn2 model is defined in [nanni2024.py](https://github.com/ntorqulu/taxo_classification/blob/main/src/models/architectures/nanni2024.py) and defined with:
+```
+class nanni_cnn2(BaseModel):
+    def __init__(self,
+                 sequence_length: int,
+                 output_size: int,
+                 hidden_size: int = 1024,
+                 name: str = "nanni_cnn2"):
+```
+**Key Components**  
+1. Convolutional layer with 16 filters, kernel size 5 and padding = "same".
+2. ReLu activation layer.
+3. Convolutional layer with 36 filters, kernel size 5 and padding = "same".
+4. ReLu activation layer.
+5. Max pooling layer with kernel size 2
+8. Dropout set at 0.5 of probability
+9. ReLu activation layer
+10. Fully connected NN with three layers and ReLu activation layers in between. The hidden size was set to 1024 as in the original MS
+
+#### 5.2.3 Nanni attention
+**Overview:**
+TODO
+
+**Architecture Details**
+The TODO model is defined in [nanni2024.py](https://github.com/ntorqulu/taxo_classification/blob/main/src/models/architectures/nanni2024.py) and defined with:
+```
+TODO
+```
+**Key Components**  
+1. TODO
+
 ### 5.3 BERT-based Model
 **Overview:**  
 The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
@@ -667,12 +726,12 @@ In the following charts, you can see a comparison of different architectures in 
 
 This chart corresponds to the **order level** (251 different categories in the training dataset) of the taxonomy, and it shows that the Enhanced MLP model achieves the best scores across the different metrics:.
 
-<img width="647" height="548" alt="imatge" src="https://github.com/user-attachments/assets/0cd32484-d8f7-4dde-b978-5e40a5ecdfa2" />
+<img width="596" height="567" alt="imatge" src="https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/arch_order.png" />
 
 
 The following chart corresponds to the **genus level** (2,246 different categories in the training dataset) of the taxonomy, and the best results are from the Enhanced MLP, Nanni 2024 with attention, and Nanni 2024 CNN2 models. The Nanni models performs better in the genus level that order level.
 
-<img width="596" height="567" alt="imatge" src="https://github.com/user-attachments/assets/0521be14-be37-4a6e-a279-88b92c661087" />
+<img width="596" height="567" alt="imatge" src="https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/arch_genus.png" />
 
 
 **Coding comparison**
@@ -681,9 +740,9 @@ In the next charts we'll see the differences in terms of encoding using the same
 
 The first chart corresponds to the order level of the taxonomy, and the second one to the genus level. As you can observe, the 4-row encoding performs better than the others, although not far from the one-hot encodings. The KMer encodings perform worse, especially those with lower K values (lower K means less information). Note that in our case, the 4-row encoding has the same size as the one-hot encoding with 4 bits, but it still performs better.
 
-<img width="569" height="575" alt="imatge" src="https://github.com/user-attachments/assets/f199a24f-0bb8-465e-8862-0e90a882f231" />
+<img width="569" height="575" alt="imatge" src="https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/coding_order.png" />
 
-<img width="565" height="574" alt="imatge" src="https://github.com/user-attachments/assets/80a0330d-096b-4220-882e-863fc8c8984b" />
+<img width="569" height="575" alt="imatge" src="https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/coding_genus.png" />
 
 
 ---
