@@ -19,7 +19,7 @@ level_name <- opt$level
 output_plot <- opt$output_plot
 
 # input_table <- "PCA/embeddings.tsv"  # Default value for input_table
-# level_name <- "order_name"            # Default value for level_name
+# level_name <- "genus_name"            # Default value for level_name
 # output_plot <- paste0("PCA/",gsub("_name","",level_name),".png")     # Default value for output_plot
 
 df <- read.table(input_table, header = TRUE, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
