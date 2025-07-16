@@ -412,8 +412,8 @@ It has been trained with the following architecture parameters:
          x2 = net(concat(x1, x0))
          x3 = net(concat(x2, x0))
 
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). As an example you
-can check out `connected_hparams.json` and the parameters `model_type`, `connected_type` and `connected_models`
+- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). For examples, 
+you can check `connected_hparams.json` and the parameters `model_type`, `connected_type`, and `connected_models`.
 
 **Layer Architectures**  
 <img width="1256" height="708" alt="Connected Models Architectures" src="https://github.com/user-attachments/assets/f39aed16-cf3a-47d9-8707-0b61ce4e958b" />
@@ -441,9 +441,8 @@ Such JSON can have the following keys:
 
 - `batch_size`: int, size of the batch for the training process. See [DataLoader](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
 - `bits`: int, number of bits used in the one-hot-encoding codifications of sequences. If bits = 0, then the 4xN matrix codification is used. See DNA codification section for further information. If bits is not None, then k must not be specified in the json.
-- `connected_type`: str, Only for `model_type="connected". Connected type model. Valid values are "iterative", "densenet", "resnet", "recurrent""
-- `connected_models`: dict[str, str], Only for `model_type="connected"`. For each level, the model to be used. It can be any 
-of "model_type" parameter values (currently only tested for "nanni_cnn2").
+- `connected_type`: str. Only for `model_type="connected"`. Specifies the type of connected model. Valid values are "iterative", "densenet", "resnet", and "recurrent".
+- `connected_models`: dict[str, str]. Only for `model_type="connected"`. Specifies the model to be used at each level. Each value must be one of the valid `model_type` options (currently only tested with "nanni_cnn2").
 - `dropout`: Float, probability of an element to be zeroed. See [p from Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html#torch.nn.Dropout). Can be used in the cnn and enhanced_mlp models but those from Nanni 2024, the Dropout is fixed.
 - `epochs`: int, number of epochs to use in the training phase.
 - `eval_frequency`: int, How often to run full evaluation (epochs).
@@ -486,12 +485,12 @@ This project supports two main types of classification models: **Singlerank** (s
 
 ### 7.1. Single-rank Models
 
-** Run command:**
+**Run command:**
 ```bash
 PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/<your_config>.json
 ```
 
-- Example:
+**Example:**
   ```bash
   PYTHONPATH=$(pwd)/src/ python src/models/main_singlerank.py --config src/models/hyperparams/singlerank/kmer_hparams.json
   ```
@@ -625,9 +624,14 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 
 ---
 ## 11. Results
-TODO
-Checkout the Results folder.
 
+In the `Results` folder, you will find the trained models. In each subfolder, you'll find:
+
+- `*_best.pt`: the PyTorch checkpoint file.
+- `.json`: a file with the parameters used for training.
+- `.log`: a file with the log output during training.
+- `README.md`: a file with the commands used to train the model.
+- 
 ---
 
 ## 12. DNA Prediction App
@@ -713,7 +717,7 @@ TTTAGCCTCTTCTTTAGGTCATAGAGGAAGCTCCGTGGACCTAGCAATTTTTTCTTTACATCTAGCAGGAGCTTCTTCTA
 ```
 
 - **Predicted Genus:** *Pontogammarus* 
-- **Taxonomic Relationship:** Both genera belong to the same family (Maeridae) and order (Amphipoda)
+- **Taxonomic Relationship:** Both genera belong to the same family (Pontogammaridae) and order (Amphipoda)
 - **Biological Significance:** The prediction demonstrates the model's ability to capture phylogenetic relationships
 
 
@@ -737,9 +741,9 @@ ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTA
 
 | Taxonomic Rank | Taxon Name | Sample Count |
 |----------------|------------|--------------|
-| Order          | Stolidobranchia | 199 |
-| Family         | Styelidae | 133 |
-| Genus          | Botrylloides | 0 (absent) |
+| Order          | Stolidobranchia | 1,240 |
+| Family         | Styelidae | 45 |
+| Genus          | Botrylloides | 32 |
 | Species        | Not known | 0 (absent) |
 ```
 
