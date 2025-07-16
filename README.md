@@ -243,6 +243,9 @@ Three main approaches are implemented:
 | 4×N Matrix     | 4 rows (A,C,G,T) × sequence length | (4, N)            | CNNs, sequence models    |
 | One-hot/Bit    | Flat vector, 4 bits per nucleotide | (4×N,)            | MLPs, simple classifiers |
 
+<img width="1333" height="765" alt="imatge" src="https://github.com/user-attachments/assets/705a72cc-8cbd-40b0-a9a2-402bc128d4a1" />
+
+
 ---
 ## 5. Model Architectures
 
