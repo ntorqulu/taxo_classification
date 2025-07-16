@@ -328,10 +328,10 @@ It has been trained with the following architecture parameters:
   - **Nanni Attention Models:** Hybrid self-attention and BiLSTM for interpretability and accuracy.
 - **Features:** Fixed kernel sizes, dropout, and attention layers (for attention models).
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
-**Layer Architectures**  
-
-<img width="300" height="563" alt="Nanni Attention Model" src="https://github.com/user-attachments/assets/227c3f3b-dbd8-4a59-a56a-037deb695659" />
+**Layer Architectures**
+  
 <img width="1256" height="708"  alt="CNN1 and CNN2" src="https://github.com/user-attachments/assets/c0d63026-c6e4-4153-b783-3651dcdde3f1" />
+<img width="300" height="563" alt="ATT" src="https://github.com/user-attachments/assets/987b99e3-bd29-4f08-99e4-4ee97939b373" />
 
 #### 5.2.1 Nanni CNN1
 **Overview:**
