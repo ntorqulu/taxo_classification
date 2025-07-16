@@ -330,9 +330,6 @@ It has been trained with the following architecture parameters:
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
 **Layer Architectures**
   
-<img width="1256" height="708"  alt="CNN1 and CNN2" src="https://github.com/user-attachments/assets/c0d63026-c6e4-4153-b783-3651dcdde3f1" />
-<img width="300" height="563" alt="ATT" src="https://github.com/user-attachments/assets/987b99e3-bd29-4f08-99e4-4ee97939b373" />
-
 #### 5.2.1 Nanni CNN1
 **Overview:**
 This is the simplest model of the ones inspired by Nanni et al. (2024). The code was addapted from Matlab to pytorch and the parameters were keps as much as possible as in the original MS.
@@ -352,6 +349,10 @@ class nanni_cnn1(BaseModel):
 2. Batch normalization 2D
 3. Dropout set at 0.5 of probability
 4. Fully connected NN with two layers. The hidden size was set to 8 as in the original MS
+
+**Layer Architecture**  
+
+<img width="306" height="601" alt="imatge" src="https://github.com/user-attachments/assets/9cde8da3-4f3a-41b2-bfdb-a39e361ee3c8" />
 
 **Training**
 Training was performed using the same parameters as in Nanni et al. (2024) but results clearly improved specially when increasing the hidden size of the Fully connected NN.
@@ -380,6 +381,10 @@ class nanni_cnn2(BaseModel):
 9. ReLu activation layer
 10. Fully connected NN with three layers and ReLu activation layers in between. The hidden size was set to 1024 as in the original MS
 
+**Layer Architecture**  
+
+<img width="524" height="589" alt="imatge" src="https://github.com/user-attachments/assets/22fffbce-bedc-4158-9734-09375b50c21f" style="display: block; margin: auto;" style="display: block; margin: auto;" />
+
 #### 5.2.3 Nanni attention
 **Overview:**
 This model combines multi-head self-attention, Bi-LSTMs and learnable attention pooling mecanism to generate.  
@@ -406,6 +411,10 @@ class nanni_att(BaseModel):
 4. **Learnable attention pooling** Produces a single sequence-level representation of attention via softmax.
 5. **Batch normalization**: Normalizes the pooled output.
 6. **FC**: FC of `hidden_size=100` to output size.
+
+**Layer Architecture**
+
+<img width="300" height="563" alt="ATT" src="https://github.com/user-attachments/assets/987b99e3-bd29-4f08-99e4-4ee97939b373" style="display: block; margin: auto;" />
 
 ### 5.3 BERT-based Model
 **Overview:**  
