@@ -10,52 +10,52 @@ Here we propose Deep Learning models as a potential solution for such problem. W
 ---
 ## Table of Content
 
-- [Project Structure](#1-project-structure)
-- [Installation](#2-installation)
-- [Data Acquisition](#3-data-acquisition)
-  - [Source Databases](#31-source-databases)
-- [Data Preprocessing](#4-data-preprocessing)
-  - [Format Raw Data](#41-format-raw-data-with-sequenceformatter-class)
-  - [Clean Data with `TaxonomyDataCleaner` class](#42-clean-data-with-taxonomydatacleaner-class)
-  - [Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class](#43-create-hierarchical-filtered-dataset-with-taxonomydatafilter-class)
-  - [Create Hierarchical Dataset with `TaxonomyDataFilter` class](#43-create-hierarchical-filtered-dataset-with-taxonomydatafilter-class)
-  - [Generating Parquet Files](#45-generating-parquet-files)
-- [DNA Codification](#44-dna-codification)
-  - [K-merisation](#441-k-merisation)
-  - [4×N Matrix (4-row Matrix)](#442-4n-matrix-4-row-matrix)
-  - [One-hot Encoding (Bit Encoding)](#443-one-hot-encoding-bit-encoding)
-- [Model Architectures]([#5-model-architectures))
-  - [Enhanced Multi-Layer Perceptron (MLP)](#51-enhanced-multi-layer-perceptron-mlp)
-  - [Nanni CNN Variants]()
-    - [Nanni CNN1]()
-    - [Nanni CNN2]()
-    - [Nanni attention]()
-    - [BERT-based Model]()
-    - [Connected Models]()
-- [Configuration and Hyperparameters]()
-- [Training]()
-  - [Single-rank Models]()
-  - [Multirank (Hierarchical) Models]()
-- [Results]()
-- [DNA Prediction App]()
-  - [App Overview]()
-  - [Installation]()
-- [Experiments]()
-  - [Model Inference Using the DNA Predictor App]()
-    - [Perfect Classification of Known Taxa]()
-    - [Taxonomically Proximate Predictions for Unknown Taxa]()
-    - [Gap-Filling for Incomplete Taxonomic Data]()
-  - [Interpretability]()
-    - [PCA]()
-    - [Attention results]()
-- [License]()
-- [References]()
-- [Open Research Questions]()
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Data Acquisition](#data-acquisition)
+  - [Source Databases](#source-databases)
+- [Data Preprocessing](#data-preprocessing)
+  - [Format Raw Data](#format-raw-data-with-sequenceformatter-class)
+  - [Clean Data with `TaxonomyDataCleaner` class](#clean-data-with-taxonomydatacleaner-class)
+  - [Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class](#create-hierarchical-filtered-dataset-with-taxonomydatafilter-class)
+  - [Create Hierarchical Dataset with `TaxonomyDataFilter` class](#create-hierarchical-dataset-with-taxonomydatafilter-class)
+  - [Generating Parquet Files](#generating-parquet-files)
+- [DNA Codification](#dna-codification)
+  - [K-merisation](#k-merisation)
+  - [4×N Matrix (4-row Matrix)](#4n-matrix-4-row-matrix)
+  - [One-hot Encoding (Bit Encoding)](#one-hot-encoding-bit-encoding)
+- [Model Architectures]([#model-architectures))
+  - [Enhanced Multi-Layer Perceptron (MLP)](#enhanced-multi-layer-perceptron-mlp)
+  - [Nanni CNN Variants](#nanni-cnn-variants)
+    - [Nanni CNN1](#nanni-cnn1)
+    - [Nanni CNN2](#nanni-cnn2)
+    - [Nanni attention](#nanni-attention)
+    - [BERT-based Model](#bert-based-model)
+    - [Connected Models](#connected-models)
+- [Configuration and Hyperparameters](#configuration-and-hyperparameters)
+- [Training](#training)
+  - [Single-rank Models](#single-rank-models)
+  - [Multirank (Hierarchical) Models](#multirank-hierarchical-models)
+- [Results](#results)
+- [DNA Prediction App](#dna-prediction-app)
+  - [App Overview](#app-overview)
+  - [Installation](#installation)
+- [Experiments](#experiments)
+  - [Model Inference Using the DNA Predictor App](#model-inference-using-the-dna-predictor-app)
+    - [Perfect Classification of Known Taxa](#perfect-classification-of-known-taxa)
+    - [Taxonomically Proximate Predictions for Unknown Taxa](#taxonomically-proximate-predictions-for-unknown-taxa)
+    - [Gap-Filling for Incomplete Taxonomic Data](#gap-filling-for-incomplete-taxonomic-data)
+  - [Interpretability](#interpretability)
+    - [PCA](#pca)
+    - [Attention results](#attention-results)
+- [License](#license)
+- [References](#references)
+- [Open Research Questions](#open-research-questions)
  
 ---
 
 ---
-## 1. Project Structure
+## Project Structure
 TODO
 ```bash
 taxo_classification/
@@ -144,7 +144,7 @@ taxo_classification/
 
 ---
 
-## 2. Installation
+## Installation
 
 1. **Clone the repository:**
     ```bash
@@ -163,25 +163,25 @@ taxo_classification/
     ```
 
 ---
-## 3. Data Acquisition
+## Data Acquisition
 
-### 3.1. Source Databases
+### Source Databases
 
 To obtain the database we used the sequences from [mkCOInr](https://github.com/meglecz/mkCOInr) as described in [NJORDR-MJOLNIR3](https://github.com/adriantich/NJORDR-MJOLNIR3) and can be downloaded from google drive: [NJORDR_sequences](https://drive.google.com/file/d/1YU_jIRIm9rpEC4okD5xh2qr3EnGBg3i8/view?usp=sharing), [names.dmp](https://drive.google.com/file/d/1WrRHX5Mf23ijg03K5YNaAx3dtzgIX5Zn/view?usp=sharing) and [nodes.dmp](https://drive.google.com/file/d/1D4g7PP-mdP9xqsxM9ZC_Bz9wqANkf6UN/view?usp=sharing). These are sequences from the public databases NCBI and BOLD and sequences obtained by scientific groups in University of Barcelona, Center for Advanced Studies of Blanes and Alfred Wagener Institute.
 
 ---
 
-## 4. Data Preprocessing
+## Data Preprocessing
 
 To clean and format the database, the following steps were performed:
 
-#### 4.1. Format Raw Data with `SequenceFormatter` class
+#### Format Raw Data with `SequenceFormatter` class
 - Merge the taxonomic information and cut the region defined by the Leray-XT primers using the `SequenceFormatter` class.
 - For each sequence, retain only the information regarding the following ranks: **Superkingdom**, **Kingdom**, **Phylum**, **Order**, **Species**.
 - If any sequence has one of these ranks empty, retrieve the information from the rank immediately below (or two levels below) and mark it as *predicted* for further standardization or removal.
 - Capitalize all bases in the sequence.
 
-#### 4.2. Clean Data with `TaxonomyDataCleaner` class
+#### Clean Data with `TaxonomyDataCleaner` class
 - Remove sequences shorter than **299 bp**.
 - Filter out sequences with ambiguous bases (e.g., **N**).
 - Filter out sequences with non-standard bases.
@@ -189,7 +189,7 @@ To clean and format the database, the following steps were performed:
 - Remove duplicate sequences.
 - Ensure complete taxonomic information up to the **species** level.
 
-#### 4.3. Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class
+#### Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class
 - Filter sequences longer than **320 bp**.
 - Clean approximated or uncertain taxonomic names, removing or standardizing them.
 - Create four nested classification levels:
@@ -206,7 +206,7 @@ To clean and format the database, the following steps were performed:
   - **Level 4 (Order)**:  
     `Diptera`, `Lepidoptera`, `Hymenoptera`, `Coleoptera`, `Hemiptera`, `Trichoptera`, `Orthoptera`, `Ephemeroptera`, `Odonata`, `Blattodea`, `Thysanoptera`, `Psocoptera`, `Plecoptera`, `Neuroptera`, `Other_insecta`, `No_insecta`
 
-#### 4.4. Create Hierarchical Dataset with `TaxonomyDataFilter` class
+#### Create Hierarchical Dataset with `TaxonomyDataFilter` class
 - Filter sequences longer than **320 bp**.
 - Clean approximated or uncertain taxonomic names, removing or standardizing them.
 - Does not created nested classification levels, keeps the names of the labels for each rank as it is.
@@ -219,7 +219,7 @@ cd taxo_classification
 python -m src.preprocessing.filter
 ```
 
-#### 4.5. Generating Parquet Files
+#### Generating Parquet Files
 
 **Code Reference:**  
 - [`generate_parquets.py`](generate_parquets.py)
@@ -245,7 +245,7 @@ python generate_parquets.py --coding 4row
 **To use `all_ranks`, specify the correct CSV in your script or config.**
 
 ---
-### 4.4 DNA Codification
+### DNA Codification
 
 **Code Reference:**  
 - [`src/feature_extraction/main.py`](src/feature_extraction/main.py) (`SequenceCoder` class)
@@ -253,19 +253,19 @@ python generate_parquets.py --coding 4row
 
 Three main approaches are implemented:
 
-#### 4.4.1 K-merisation
+#### K-merisation
 
 - **Description:** Breaks DNA into overlapping substrings of length *k* (k-mers).
 - **Implementation:** `SequenceCoder.coding_kmer_optimized`
 - **Parquet Output:** `dataset_kmer_*.parquet`
 
-#### 4.4.2 4×N Matrix (4-row Matrix)
+#### 4×N Matrix (4-row Matrix)
 
 - **Description:** Each sequence is a 4×N binary matrix (A, C, G, T × sequence length).
 - **Implementation:** `SequenceCoder.coding_one_hot_4rowMatrix_optimized`
 - **Parquet Output:** `dataset_4rowmatrix.parquet`
 
-#### 4.4.3 One-hot Encoding (Bit Encoding)
+#### One-hot Encoding (Bit Encoding)
 
 - **Description:** Each nucleotide is a one-hot vector, sequence is flattened.
 - **Implementation:** `SequenceCoder.coding_one_hot_bit_optimized`
@@ -281,7 +281,7 @@ Three main approaches are implemented:
 
 
 ---
-## 5. Model Architectures
+## Model Architectures
 
 **Code Reference:**  
 - [`src/models/architectures/`](src/models/architectures/)
@@ -290,7 +290,7 @@ Three main approaches are implemented:
 
 Supported architectures:
 
-### 5.1 Enhanced Multi-Layer Perceptron (MLP)
+### Enhanced Multi-Layer Perceptron (MLP)
 **Overview**  
 The Enhanced Multi-Layer Perceptron (Enhaced MLP) is a more complex version of the standard fully connected neural network, designed for taxonomic classification.
 
@@ -350,7 +350,7 @@ It has been trained with the following architecture parameters:
 "use_batch_norm": true
 ```
   
-### 5.2 Nanni CNN Variants
+### Nanni CNN Variants
 - **File:** [`nanni2024.py`](src/models/architectures/nanni2024.py)
 - **Description:** Advanced CNNs inspired by Nanni et al. (2020, 2024), designed for DNA sequence classification.
 - **Variants:**
@@ -362,7 +362,7 @@ It has been trained with the following architecture parameters:
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
 **Layer Architectures**
   
-#### 5.2.1 Nanni CNN1
+#### Nanni CNN1
 **Overview:**
 This is the simplest model of the ones inspired by Nanni et al. (2024). The code was addapted from Matlab to pytorch and the parameters were keps as much as possible as in the original MS.
 
@@ -389,7 +389,7 @@ class nanni_cnn1(BaseModel):
 **Training**
 Training was performed using the same parameters as in Nanni et al. (2024) but results clearly improved specially when increasing the hidden size of the Fully connected NN.
 
-#### 5.2.2 Nanni CNN2
+#### Nanni CNN2
 **Overview:**
 This model is an improvement of the previous model. This model adds a new convolutional layer and increase the complexity of the fully connected layer by adding an extra layer and increasing the hidden size.
 
@@ -417,7 +417,7 @@ class nanni_cnn2(BaseModel):
 
 <img width="524" height="589" alt="imatge" src="https://github.com/user-attachments/assets/22fffbce-bedc-4158-9734-09375b50c21f" style="display: block; margin: auto;" style="display: block; margin: auto;" />
 
-#### 5.2.3 Nanni attention
+#### Nanni attention
 **Overview:**
 This model combines multi-head self-attention, Bi-LSTMs and learnable attention pooling mecanism to generate.  
 
@@ -448,7 +448,7 @@ class nanni_att(BaseModel):
 
 <img width="300" height="563" alt="ATT" src="https://github.com/user-attachments/assets/987b99e3-bd29-4f08-99e4-4ee97939b373" style="display: block; margin: auto;" />
 
-### 5.3 BERT-based Model
+### BERT-based Model
 **Overview:**  
 The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
 
@@ -504,7 +504,7 @@ It has been trained with the following architecture parameters:
 ```
 
 
-### 5.4 Connected Models
+### Connected Models
 **Overview**  
 The connected models are an implementation of different connected models such as Iterative
 fixed input network, densely connected network (DenseNet), residual network (ResNet) or 
@@ -565,7 +565,7 @@ you can check `connected_hparams.json` and the parameters `model_type`, `connect
 
 ---
 
-## 6. Configuration and Hyperparameters
+## Configuration and Hyperparameters
 
 **Code Reference:**  
 
@@ -617,7 +617,7 @@ Only labels in each column with cardinality higher than the specified value will
 - `use_scheduler`: Bool, Whether to use or not the scheduler for the lr
 - `weight_decay`: float, weight_decay for the optimizers. For adam is 0 by default and for sgd is 1e-4 by default
 
-## 7. Training
+## Training
 
 **Code Reference:**  
 - [`src/models/main_singlerank.py`](src/models/main_singlerank.py)
@@ -626,7 +626,7 @@ Only labels in each column with cardinality higher than the specified value will
 
 This project supports two main types of classification models: **Singlerank** (single taxonomic level) and **Multirank** (hierarchical, multi-level). Both are configured via JSON files and run from the command line.
 
-### 7.1. Single-rank Models
+### Single-rank Models
 
 **Run command:**
 ```bash
@@ -693,7 +693,7 @@ See `src/models/hyperparams/singlerank/` for example configs for each model type
 
 ---
 
-### 7.2. Multirank (Hierarchical) Models
+### Multirank (Hierarchical) Models
 
 **Run command:**
 ```bash
@@ -761,12 +761,7 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 - For hierarchical models, the available taxonomic levels are detected automatically from the dataset columns.
 - For more details on each parameter, see the example config files and code comments in `src/models/main_singlerank.py` and `src/models/main_multirank.py`.
 
----
-### 9. Category Balance for training
-### 10. Hyperparameter optimisation
-
----
-## 11. Results
+## Results
 
 **Trained Models**
 
@@ -805,18 +800,18 @@ The first chart corresponds to the order level of the taxonomy, and the second o
 
 ---
 
-## 12. DNA Prediction App
+## DNA Prediction App
 
 The project includes an application for taxonomic classification of DNA sequences without requiring programming knowledge. This app allows researchers to quickly classify DNA sequences using out pre-trained models.
 
-### 12.1. App Overview
+### App Overview
 
 - Direct sequence input via text field
 - Multiple model selection (BERT, CNN, Cascade, etc.)
 - Confidence scores for each prediction level
 - Prediction of the most confident label based on the sequence inputed
 
-### 12.2. Installation
+### Installation
 
 To run with python in the command line:
   ```bash
@@ -827,10 +822,10 @@ To run with python in the command line:
   python -m app.run
   ```
 
-## 13. Experiments
+## Experiments
 This section presents the experiments conducted in this project
 
-### 13.1 Model Inference Using the DNA Predictor App
+### Model Inference Using the DNA Predictor App
 
 **Hypothesis:** We expect that models trained on taxonomic DNA sequences will be able to classify new, unseen sequences to their correct taxonomic rank. We hypothesize that:
 - For labels present in the training split, the model will predict this exact label
@@ -849,7 +844,7 @@ This section presents the experiments conducted in this project
 
 **Results:**
 
-#### 13.1.1 Perfect Classification of Known Taxa
+#### Perfect Classification of Known Taxa
 
 For sequences where both order and genus labels were present in the training split, the models achieved near-perfect classification:
 
@@ -871,7 +866,7 @@ TTTATCAAGTAACATTGCTCATTCTGGTGCTTCAGTTGACTTATCAATTTTCTCTTTACATTTAGCGGGTGCTTCGTCAA
 
 *Figure 1: DNA Predictor App showing perfect classification of known taxa using Enhanced MLP with optimal encoding methods*
 
-#### 13.1.2 Taxonomically Proximate Predictions for Unknown Taxa
+#### Taxonomically Proximate Predictions for Unknown Taxa
 
 For genus *Elasmopus* (absent from training data), the model predictions were taxonomically coherent:
 
@@ -901,7 +896,7 @@ TTTAGCCTCTTCTTTAGGTCATAGAGGAAGCTCCGTGGACCTAGCAATTTTTTCTTTACATCTAGCAGGAGCTTCTTCTA
 
 *Figure 3: Phylogenetic relationship between Elasmopus and Pontogammarus showing their taxonomic proximity*
 
-#### 13.1.3 Gap-Filling for Incomplete Taxonomic Data
+#### Gap-Filling for Incomplete Taxonomic Data
 
 For sequences with incomplete taxonomic information (blank genus labels), the models provided taxonomically consistent predictions:
 
@@ -921,10 +916,10 @@ ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTA
 ![Gap Filling Prediction](readme_files/gif/gap_filling_prediction.gif)
 
 *Figure 4: Model predicting taxonomically consistent genus for sequences with incomplete taxonomic information*
-#### 13.2 Interpretability
+#### Interpretability
 We performed some interpretability analysis with two different models that could explain the performance showed in the 13.1.3. 
 
-##### 13.2.1 PCA
+##### PCA
 We used [57 sequences](https://github.com/ntorqulu/taxo_classification/blob/main/PCA/real_seqs.tsv) from a real experiment that tried to detect invasive species in the harbour of Blanes to obtain their embeddings and compare the taxonomical classification performed with the standard software and pipelines for metabarcoding analisis with the PCA representation in 2D. The embedding was obtained by converting to a vector the output of the convolutional layer the trained Nanni_cnn1 model trained at different levels. We detected that those sequences identified as being part of the same genus were clustering together. In addition the separation of two clouds preserved the evolutive information at the phylum level in which we detected that the chordata were separated from the rest of the groups. See Figure 4 and Figure 5. 
 
 <img width="486" height="417" src="https://github.com/ntorqulu/taxo_classification/blob/main/PCA/genus.png" />
@@ -936,7 +931,7 @@ We used [57 sequences](https://github.com/ntorqulu/taxo_classification/blob/main
 
 *Figure 5: PCA representation of the embeddings obtained from the convolutional layer of the nanni_cnn1 at phylum level*
 
-##### 13.2.2 Attention results
+##### Attention results
 
 We also performed an analysis calculating the mean values of the attention for the preddicion of certain groups. As shown in the Figure 6 animation, closer groups show higher values in the same positions and this pattern is repeated as the taxonomic level increase grouping the barcodes of the animation in the same group. 
 
@@ -960,13 +955,13 @@ We also performed an analysis calculating the mean values of the attention for t
 
 ---
 
-## 13. License
+## License
 
 This project is licensed under the terms of the [MIT License](LICENSE).
 
 ---
 
-## 14. References
+## References
 
 TODO: Add more references
 - Nanni, L., et al. (2020, 2024). [Deep learning architectures for DNA sequence classification.](https://www.mdpi.com/3054648)
@@ -976,7 +971,7 @@ TODO: Add more references
 
 ---
 
-## 15. Open Research Questions
+## Open Research Questions
 
 - How can data augmentation address class imbalance in this context?
 - Which encoding method performs best for each model type?
