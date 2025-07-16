@@ -863,6 +863,21 @@ ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTA
 ![Gap Filling Prediction](readme_files/gif/gap_filling_prediction.gif)
 
 *Figure 4: Model predicting taxonomically consistent genus for sequences with incomplete taxonomic information*
+#### 13.2 Interpretability
+We performed some interpretability analysis with two different models that could explain the performance showed in the 13.1.3. 
+
+##### 13.2.1 PCA
+We used [57 sequences](https://github.com/ntorqulu/taxo_classification/blob/main/PCA/real_seqs.tsv) from a real experiment that tried to detect invasive species in the harbour of Blanes to obtain their embeddings and compare the taxonomical classification performed with the standard software and pipelines for metabarcoding analisis with the PCA representation in 2D. The embedding was obtained by converting to a vector the output of the convolutional layer the trained Nanni_cnn1 model trained at different levels. We detected that those sequences identified as being part of the same genus were clustering together. In addition the separation of two clouds preserved the evolutive information at the phylum level in which we detected that the chordata were separated from the rest of the groups. See Figure 4 and Figure 5. 
+
+<img width="486" height="417" src="https://github.com/ntorqulu/taxo_classification/blob/main/PCA/pca_plot.png" />
+
+*Figure 4: PCA representation of the embeddings obtained from the convolutional layer of the nanni_cnn1 at genus level*
+
+
+<img width="486" height="417" src="https://github.com/ntorqulu/taxo_classification/blob/main/PCA/phylum.png" />
+
+*Figure 5: PCA representation of the embeddings obtained from the convolutional layer of the nanni_cnn1 at phylum level*
+
 
 **Conclusions:**
 
