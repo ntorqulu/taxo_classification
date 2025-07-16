@@ -659,23 +659,27 @@ In the `Results` folder, you will find the trained models. In each subfolder, yo
 
 **Architecture comparison**
 
-Order:
+In the following charts, you can see a comparison of different architectures in terms of Accuracy, F1, and Precision on the test datasets. Some models are missing from one of the charts due to poor performance or because they haven't been trained yet.
 
-<img width="863" height="731" alt="imatge" src="https://github.com/user-attachments/assets/0cd32484-d8f7-4dde-b978-5e40a5ecdfa2" />
+This chart corresponds to the **order level** (251 different categories in the training dataset) of the taxonomy, and it shows that the Enhanced MLP model achieves the best scores across the different metrics:.
 
-Genus:
+<img width="647" height="548" alt="imatge" src="https://github.com/user-attachments/assets/0cd32484-d8f7-4dde-b978-5e40a5ecdfa2" />
 
-<img width="794" height="757" alt="imatge" src="https://github.com/user-attachments/assets/0521be14-be37-4a6e-a279-88b92c661087" />
+The following chart corresponds to the **genus level** (2,246 different categories in the training dataset) of the taxonomy, and the best results are from the Enhanced MLP, Nanni 2024 with attention, and Nanni 2024 CNN2 models. The Nanni models performs better in the genus level that order level.
+
+<img width="596" height="567" alt="imatge" src="https://github.com/user-attachments/assets/0521be14-be37-4a6e-a279-88b92c661087" />
+
 
 **Coding comparison**
 
 Order:
 
-<img width="759" height="767" alt="imatge" src="https://github.com/user-attachments/assets/f199a24f-0bb8-465e-8862-0e90a882f231" />
+<img width="569" height="575" alt="imatge" src="https://github.com/user-attachments/assets/f199a24f-0bb8-465e-8862-0e90a882f231" />
 
 Genus:
 
-<img width="754" height="766" alt="imatge" src="https://github.com/user-attachments/assets/80a0330d-096b-4220-882e-863fc8c8984b" />
+<img width="565" height="574" alt="imatge" src="https://github.com/user-attachments/assets/80a0330d-096b-4220-882e-863fc8c8984b" />
+
 
 ---
 
