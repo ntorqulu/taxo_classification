@@ -702,13 +702,13 @@ ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTA
 
 **Conclusions:**
 
-1. **Encoding Optimization:** Different taxonomic levels benefit from different encoding methods - k-mer encoding is best for genus-level classification while 4-row encoding performs better for order-level classification.
+1. **Encoding Optimization:** Different taxonomic levels benefit from different encoding methods - k-mer encoding is best for genus-level classification because it has more data to train while 4-row encoding performs better for order-level classification because the encoding provides more spatial information.
 
 2. **Phylogenetic Awareness:** Models demonstrate understanding of phylogenetic relationships, predicting proximal classes for unknown taxa. This suggests that the models learn evolutionary relationships present in the DNA sequences.
 
-3. **Practical Application:** The models show potential for gap-filling and correction tasks in incomplete taxonomic databases-
+3. **Practical Application:** The models show potential for gap-filling and correction tasks in incomplete taxonomic databases.
 
-4. **Model Architecture Insights:** Enhanced MLP consistently outperformed other architectures, likely due to its simpler architecture, dynamic input handling and regularization techniques.
+4. **Model Architecture Insights:** Enhanced MLP consistently outperformed other architectures, likely due to its simpler architecture.
 
 **Future Hypotheses:**
 - **Taxonomic Hierarchy:** Models may perform better at higher taxonomic levels due to increased training data availability. Data augmentation or incorporation of the cascade hierarchical models would benefit the app.
