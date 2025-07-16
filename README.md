@@ -311,17 +311,22 @@ It has been trained with the following architecture parameters:
 "use_batch_norm": true
 ```
   
-### 5.3 Nanni CNN Variants
+### 5.2 Nanni CNN Variants
 - **File:** [`nanni2024.py`](src/models/architectures/nanni2024.py)
 - **Description:** Advanced CNNs inspired by Nanni et al. (2020, 2024), designed for DNA sequence classification.
 - **Variants:**
   - **Nanni CNN1:** Compact CNN for efficient modeling.
-  - **Nanni CNN2:** Deeper CNN with more filters and layers.
+  - **Nanni CNN2:** Deeper CNN with more filters and layers
+
   - **Nanni Attention Models:** Hybrid self-attention and BiLSTM for interpretability and accuracy.
 - **Features:** Fixed kernel sizes, dropout, and attention layers (for attention models).
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/).
+**Layer Architectures**  
 
-### 5.4 BERT-based Model
+<img width="300" height="563" alt="Nanni Attention Model" src="https://github.com/user-attachments/assets/227c3f3b-dbd8-4a59-a56a-037deb695659" />
+<img width="1256" height="708"  alt="CNN1 and CNN2" src="https://github.com/user-attachments/assets/c0d63026-c6e4-4153-b783-3651dcdde3f1" />
+
+### 5.3 BERT-based Model
 **Overview:**  
 The BERT-based model is a transformer-based architecture adapted to DNA sequence classification. Inspired by the Bidirectional Encoder Representations from Transformers (BERT) architecture, this model use self-attention mechanisms to capture contextual relations in DNA sequences.
 
@@ -352,7 +357,7 @@ class BERTTaxoModel(BaseModel):
 7. Dropout Regularization: Prevents overfitting throughout the network.
 
 **Layer Architecture**  
-<img width="1256" height="708" alt="Screenshot 2025-07-16 at 01 25 55" src="https://github.com/user-attachments/assets/fde35331-1c4d-4270-b7b8-77c228c887ad" />
+<img width="1256" height="708" alt="BERT-based Model Architecture" src="https://github.com/user-attachments/assets/fde35331-1c4d-4270-b7b8-77c228c887ad" />
 
 **DNA Encoding Adaptation**  
 The model is specifically designed for 4 row matrix encoding only:
@@ -377,7 +382,7 @@ It has been trained with the following architecture parameters:
 ```
 
 
-### 5.6 Connected Models
+### 5.4 Connected Models
 - **File:** [`connected_model.py`]
 - **Description**: Different types of connected models. 
 - **Model types**:
@@ -410,7 +415,8 @@ It has been trained with the following architecture parameters:
 - **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). As an example you
 can check out `connected_hparams.json` and the parameters `model_type`, `connected_type` and `connected_models`
 
-
+**Layer Architectures**  
+<img width="1256" height="708" alt="Connected Models Architectures" src="https://github.com/user-attachments/assets/f39aed16-cf3a-47d9-8707-0b61ce4e958b" />
 
 **Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
@@ -419,6 +425,7 @@ can check out `connected_hparams.json` and the parameters `model_type`, `connect
 ## 6. Configuration and Hyperparameters
 
 **Code Reference:**  
+
 - [`src/models/hyperparams/`](src/models/hyperparams/)
 - [`src/models/main_singlerank.py`](src/models/main_singlerank.py)
 - [`src/models/main_multirank.py`](src/models/main_multirank.py)
