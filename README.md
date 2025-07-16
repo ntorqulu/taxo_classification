@@ -674,7 +674,8 @@ TTTAGCCTCTTCTTTAGGTCATAGAGGAAGCTCCGTGGACCTAGCAATTTTTTCTTTACATCTAGCAGGAGCTTCTTCTA
 
 *Figure 2: DNA Predictor App predicting Pontogammarus for an Elasmopus sequence*
 
-![Taxonomic Tree](path/to/image/elasmopus_pontogammarus_tree.png)
+<img width="486" height="417" alt="Screenshot 2025-07-16 at 01 52 01" src="https://github.com/user-attachments/assets/d8267493-d168-494e-aed6-4a7143ed959a" />
+
 
 *Figure 3: Phylogenetic relationship between Elasmopus and Pontogammarus showing their taxonomic proximity*
 
