@@ -659,11 +659,13 @@ In the `Results` folder, you will find the trained models. In each subfolder, yo
 
 **Architecture comparison**
 
-In the following charts, you can see a comparison of different architectures in terms of Accuracy, F1, and Precision on the test datasets. Some models are missing from one of the charts due to poor performance or because they haven't been trained yet.
+In the following charts, you can see a comparison of different architectures in terms of Accuracy, F1, and Precision on the test datasets. Some models are missing from one of the charts due to poor performance or because they haven't been trained yet. Note that the highlighted model names are the ones common to both charts
+
 
 This chart corresponds to the **order level** (251 different categories in the training dataset) of the taxonomy, and it shows that the Enhanced MLP model achieves the best scores across the different metrics:.
 
 <img width="647" height="548" alt="imatge" src="https://github.com/user-attachments/assets/0cd32484-d8f7-4dde-b978-5e40a5ecdfa2" />
+
 
 The following chart corresponds to the **genus level** (2,246 different categories in the training dataset) of the taxonomy, and the best results are from the Enhanced MLP, Nanni 2024 with attention, and Nanni 2024 CNN2 models. The Nanni models performs better in the genus level that order level.
 
@@ -672,11 +674,11 @@ The following chart corresponds to the **genus level** (2,246 different categori
 
 **Coding comparison**
 
-Order:
+In the next charts we'll see the differences in terms of encoding using the same metrics as in the previous architecture comparison. We have KMer encodings for K=1 (k1), K=2 (k2), K=3 (k3), and K=4 (k4); one-hot encodings for 1 (bits1), 2 (bits2), 3 (bits3), and 4 bits (bits4); and a 4-row encoding labeled as bits0.
+
+The first chart corresponds to the order level of the taxonomy, and the second one to the genus level. As you can observe, the 4-row encoding performs better than the others, although not far from the one-hot encodings. The KMer encodings perform worse, especially those with lower K values (lower K means less information). Note that in our case, the 4-row encoding has the same size as the one-hot encoding with 4 bits, but it still performs better.
 
 <img width="569" height="575" alt="imatge" src="https://github.com/user-attachments/assets/f199a24f-0bb8-465e-8862-0e90a882f231" />
-
-Genus:
 
 <img width="565" height="574" alt="imatge" src="https://github.com/user-attachments/assets/80a0330d-096b-4220-882e-863fc8c8984b" />
 
