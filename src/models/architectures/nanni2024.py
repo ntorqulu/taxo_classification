@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as f  # add import torch.nn.functional
-from networkx import config
 
 from models.architectures.base_model import BaseModel
 
@@ -55,10 +54,10 @@ class nanni_cnn1(BaseModel):
             {"sequence_length": self.sequence_length, "hidden_size": self.hidden_size, "output_size": self.output_size}
         )
         # Add class_names if present
-        if hasattr(self, 'class_names'):
-            config['class_names'] = self.class_names
+        if hasattr(self, "class_names"):
+            config["class_names"] = self.class_names
         return config
-    
+
     def return_embedding(self, x: torch.Tensor) -> torch.Tensor:
         """
         Returns the embedding from the first fully connected layer.
@@ -79,8 +78,8 @@ class nanni_cnn1(BaseModel):
             name=config.get("name", "nanni_cnn1"),
         )
         # Restore class_names if present
-        if 'class_names' in config:
-            model.class_names = config['class_names']
+        if "class_names" in config:
+            model.class_names = config["class_names"]
 
         model.load_state_dict(checkpoint["model_state_dict"])
         return model
@@ -154,8 +153,8 @@ class nanni_cnn2(BaseModel):
             {"sequence_length": self.sequence_length, "hidden_size": self.hidden_size, "output_size": self.output_size}
         )
         # Add class_names if present
-        if hasattr(self, 'class_names'):
-            config['class_names'] = self.class_names
+        if hasattr(self, "class_names"):
+            config["class_names"] = self.class_names
         return config
 
     @classmethod
@@ -170,29 +169,14 @@ class nanni_cnn2(BaseModel):
             name=config.get("name", "nanni_cnn2"),
         )
         # Restore class_names if present
-        if 'class_names' in config:
-            model.class_names = config['class_names']
+        if "class_names" in config:
+            model.class_names = config["class_names"]
 
         model.load_state_dict(checkpoint["model_state_dict"])
         return model
 
 
 class nanni_att(BaseModel):
-    # - flattenConverts the multi-dimensional input into a 1D
-    #   vector by flattening the spatial dimensions.
-    # - selfAttentionLayer(8,64): A layer that applies self-attention, which allows the network
-    #   to focus on different parts of the input. Parameters: Number of attention heads = 8.
-    #   Size of the projection = 64. -> MultiheadAttention(emb_dim = mida output flatten layer 4*n, num_heads = 8, dropout = 0,)
-    # - bilstmLayer(100):Bidirectional Long Short-Term Memory layer; a recurrent layer that
-    #   can process sequences in both forward and backward directions. Each BiLSTM cell
-    #   has 100 hidden units.
-    # - batchNormalizationLayer: It improves model convergence and stabilizes the training
-    #   process by standardizing the inputs to each layer.
-    # - fullyConnectedLayer(numClasses): A fully connected layer that maps the output from
-    #   the BiLSTM layer to the number of classes in the classification task.
-    # - Softmax: The softmax activation layer normalizes the output into a probability distri-
-    # bution over the classes.
-
     def __init__(
         self,
         sequence_length: int,
@@ -217,46 +201,42 @@ class nanni_att(BaseModel):
         self.self_attention = nn.MultiheadAttention(
             embed_dim=self.embed_dim, num_heads=self.num_heads, batch_first=True
         )
+        self.attn_pool = nn.Linear(2 * self.hidden_size, 1)
+        nn.init.constant_(self.attn_pool.weight, 0.0)
+        nn.init.constant_(self.attn_pool.bias, 0.0)
         self.bilstm = nn.LSTM(
             input_size=embed_dim, hidden_size=self.hidden_size, num_layers=1, batch_first=True, bidirectional=True
         )
-        self.batch_norm = nn.BatchNorm1d(num_features=2 * self.hidden_size)  # 100*2 por bidireccional
+        self.batch_norm = nn.BatchNorm1d(num_features=2 * self.hidden_size)
         self.fc = nn.Linear(2 * self.hidden_size, self.output_size)
-        self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Handle 4-row/one-hot encoding: [batch, 4, seq_len] or [batch, 1, 4, seq_len]
+    def handle_dimension(self, x):
         if x.dim() == 4 and x.shape[1] == 1:
             x = x.squeeze(1)
         if x.dim() == 3 and x.shape[1] == 4:
-            # [batch, 4, seq_len] -> [batch, seq_len, 4]
             x = x.permute(0, 2, 1)
-            # Project each position (4) to embed_dim
             x = self.input_projection(x)
-            # Now x: [batch, seq_len, embed_dim]
         elif x.dim() == 2:
-            # [batch, features] (k-mer or bit encoding)
-            # Project to a sequence of length 1 (or more, if desired)
             if self.vector_projection is None or self.vector_projection.in_features != x.shape[1]:
-                # Lazy init to match input size
                 self.vector_projection = nn.Linear(x.shape[1], self.embed_dim).to(x.device)
-            # [batch, features] -> [batch, 1, embed_dim]
             x = self.vector_projection(x).unsqueeze(1)
         else:
             raise ValueError(f"Unsupported input shape for nanni_att: {x.shape}")
-
-        # Self-attention
-        x, attn_weights = self.self_attention(x, x, x)
-        # BiLSTM
-        x, _ = self.bilstm(x)
-        # [batch, seq_len, 2*hidden_size] -> [batch, 2*hidden_size, seq_len]
-        x = x.permute(0, 2, 1)
-        x = self.batch_norm(x)
-        # Global average pooling over sequence length
-        x = torch.mean(x, dim=2)
-        x = self.fc(x)
-        # Remove softmax from forward pass
         return x
+
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> torch.Tensor:
+        x = self.handle_dimension(x)
+        x, attn_weights = self.self_attention(x, x, x)
+        x, _ = self.bilstm(x)
+        attn_scores = self.attn_pool(x)
+        attn_weights = torch.softmax(attn_scores, dim=1)
+        x = torch.sum(x * attn_weights, dim=1)
+        x = self.batch_norm(x)
+        x = self.fc(x)
+        if return_attention:
+            return x, attn_weights.squeeze(-1)
+        else:
+            return x
 
     def get_config(self) -> Dict[str, Any]:
         config = super().get_config()
@@ -292,26 +272,7 @@ class nanni_att(BaseModel):
         return model
 
 
-#     2025-06-18 14:49:51 INFO     Starting training for 50 epochs
-# 2025-06-18 14:49:52 INFO     Train Epoch: 1 [0/357188] Loss: 2.775197, Acc: 3.33%
-
-
 class nanni_att_kmer(BaseModel):
-    # - flattenConverts the multi-dimensional input into a 1D
-    #   vector by flattening the spatial dimensions.
-    # - selfAttentionLayer(8,64): A layer that applies self-attention, which allows the network
-    #   to focus on different parts of the input. Parameters: Number of attention heads = 8.
-    #   Size of the projection = 64. -> MultiheadAttention(emb_dim = mida output flatten layer 4*n, num_heads = 8, dropout = 0,)
-    # - bilstmLayer(100):Bidirectional Long Short-Term Memory layer; a recurrent layer that
-    #   can process sequences in both forward and backward directions. Each BiLSTM cell
-    #   has 100 hidden units.
-    # - batchNormalizationLayer: It improves model convergence and stabilizes the training
-    #   process by standardizing the inputs to each layer.
-    # - fullyConnectedLayer(numClasses): A fully connected layer that maps the output from
-    #   the BiLSTM layer to the number of classes in the classification task.
-    # - Softmax: The softmax activation layer normalizes the output into a probability distri-
-    # bution over the classes.
-
     def __init__(
         self,
         input_size: int,
