@@ -734,7 +734,7 @@ The following chart corresponds to the **genus level** (2,246 different categori
 <img width="596" height="567" alt="imatge" src="https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/arch_genus.png" />
 
 
-**Coding comparison**
+**Encoding comparison**
 
 In the next charts we'll see the differences in terms of encoding using the same metrics as in the previous architecture comparison. We have KMer encodings for K=1 (k1), K=2 (k2), K=3 (k3), and K=4 (k4); one-hot encodings for 1 (bits1), 2 (bits2), 3 (bits3), and 4 bits (bits4); and a 4-row encoding labeled as bits0.
 
