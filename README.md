@@ -605,7 +605,113 @@ To run with python in the command line:
   python -m app.run
   ```
 
-To run with docker:
+## 13. Experiments
+This section presents the experiments conducted in this project
+
+### 13.1 Model Inference Using the DNA Predictor App
+
+**Hypothesis:** We expect that models trained on taxonomic DNA sequences will be able to classify new, unseen sequences to their correct taxonomic rank. We hypothesize that:
+- For labels present in the training split, the model will predict this exact label
+- For labels not present in the training split, the model will predict labels that are close in the taxonomic tree.
+- Different encoding methods (kmer, onehot, 4row) and model architectures will vary in performance across different taxonomic ranks.
+
+**Experiment Setup:**
+- **Test Data:** Real DNA sequences from [`PCA/real_seqs.tsv`](PCA/real_seqs.tsv) not present in the training dataset
+- **Models Tested:** All trained model architectures (Enhanced MLP, CNN, Nanni variants, BERT) in their best epoch with different encodings, stored in [`Results`](Results/)
+- **Evaluation Tool:** [`dna_predictor_app`](dna_predictor_app/) for inference and comparison
+- **Metrics:** Confidence scores, and taxonomic proximity analysis
+- **Test Categories:** 
+  1. Known taxa (present in training data)
+  2. Unknown taxa (not in training data)
+  3. Sequences with incomplete taxonomic information
+
+**Results:**
+
+#### 13.1.1 Perfect Classification of Known Taxa
+
+For sequences where both order and genus labels were present in the training split, the models achieved near-perfect classification:
+
+**Sequence:**
+TTTATCAAGTAACATTGCTCATTCTGGTGCTTCAGTTGACTTATCAATTTTCTCTTTACATTTAGCGGGTGCTTCGTCAATTTTAGGTGCCATTAATTTTATGTCTACAGTTATTAACATACGAGCTGAAACACTGACATTTGATCGACTTCCATTATTTGTCTGAAGAGTATTTATTACTGTAATTCTTTTACTTTTATCACTTCCAGTACTAGCAGGAGCTATTACTATGTTGCTAACAGATCGAAATCTGAATACCTCATTTTTTGATCCAACAGGAGGTGGAGATCCAATCTTATACCAACATCTATTT
+
+```
+
+| Taxonomic Rank | Taxon Name | Sample Count |
+|----------------|------------|--------------|
+| Order          | Balanomorpha | 2,406 |
+| Family         | Balanidae | 697 |
+| Genus          | Amphibalanus | 80 |
+```
+
+- **Best Performing Model:** Enhanced MLP with k-mer encoding for genus classification and 4-row encoding for order classification
+
+![Model Performance on Known Taxa](readme_files/gif/known_taxa_prediction.gif)
+
+*Figure 1: DNA Predictor App showing perfect classification of known taxa using Enhanced MLP with optimal encoding methods*
+
+#### 13.1.2 Taxonomically Proximate Predictions for Unknown Taxa
+
+For genus *Elasmopus* (absent from training data), the model predictions were taxonomically coherent:
+
+**Sequence:**
+TTTAGCCTCTTCTTTAGGTCATAGAGGAAGCTCCGTGGACCTAGCAATTTTTTCTTTACATCTAGCAGGAGCTTCTTCTATCTTAGGAGCTATTAATTTCATCACTACTGTAATTAATATACGAACCGCAGGAATATACATAGACCAAATCCCCTTATTTGTTTGATCTGTTTTCATTACAGCCATTCTACTTCTGCTTTCTCTTCCTGTTCTTGCTGGAGCAATTACCATACTTCTCACTGATCGAAACCTAAATACTTCTTTCTTCGACCCTTGTGGGGGAGGTGATCCAATCCTTTACCAACATTTATTC
+
+```
+
+| Taxonomic Rank | Taxon Name | Sample Count |
+|----------------|------------|--------------|
+| Order          | Amphipoda | 4,760 |
+| Family         | Maeridae | 0 (absent) |
+| Genus          | Elasmopus | 0 (absent) |
+```
+
+- **Predicted Genus:** *Pontogammarus* 
+- **Taxonomic Relationship:** Both genera belong to the same family (Pontogammaridae) and order (Amphipoda)
+- **Biological Significance:** The prediction demonstrates the model's ability to capture phylogenetic relationships
+
+
+![Elasmopus Prediction](readme_files/gif/elasmopus_prediction.gif)
+
+*Figure 2: DNA Predictor App predicting Pontogammarus for an Elasmopus sequence*
+
+![Taxonomic Tree](path/to/image/elasmopus_pontogammarus_tree.png)
+
+*Figure 3: Phylogenetic relationship between Elasmopus and Pontogammarus showing their taxonomic proximity*
+
+#### 13.1.3 Gap-Filling for Incomplete Taxonomic Data
+
+For sequences with incomplete taxonomic information (blank genus labels), the models provided taxonomically consistent predictions:
+
+**Sequence:**
+ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTATTTTAAGGTCTTTAAATTTTATAACTACTTTGTTTAATATAAAAGTTAAGAGGTGAGGGATGTTCTCCATATCTCTGTTTTGTTGAACTGTATTAGTTACTACTATTTTGTTATTATTATCTTTACCTGTTTTAGCTGCAGCTATTACAATATTACTTTTCGATCGAAATTTTAATACTTCTTTTTTTGATCCCTCTGGGAGAAGAGATCCGGTTTTGTATCAGCACTTGTTT
+
+```
+
+| Taxonomic Rank | Taxon Name | Sample Count |
+|----------------|------------|--------------|
+| Order          | Stolidobranchia | 1,240 |
+| Family         | Styelidae | 45 |
+| Genus          | Botrylloides | 32 |
+| Species        | Not known | 0 (absent) |
+```
+
+![Gap Filling Prediction](readme_files/gif/gap_filling_prediction.gif)
+
+*Figure 4: Model predicting taxonomically consistent genus for sequences with incomplete taxonomic information*
+
+**Conclusions:**
+
+1. **Encoding Optimization:** Different taxonomic levels benefit from different encoding methods - k-mer encoding is best for genus-level classification while 4-row encoding performs better for order-level classification.
+
+2. **Phylogenetic Awareness:** Models demonstrate understanding of phylogenetic relationships, predicting proximal classes for unknown taxa. This suggests that the models learn evolutionary relationships present in the DNA sequences.
+
+3. **Practical Application:** The models show potential for gap-filling and correction tasks in incomplete taxonomic databases-
+
+4. **Model Architecture Insights:** Enhanced MLP consistently outperformed other architectures, likely due to its simpler architecture, dynamic input handling and regularization techniques.
+
+**Future Hypotheses:**
+- **Taxonomic Hierarchy:** Models may perform better at higher taxonomic levels due to increased training data availability. Data augmentation or incorporation of the cascade hierarchical models would benefit the app.
+
 
 ---
 
