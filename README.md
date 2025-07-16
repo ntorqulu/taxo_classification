@@ -9,17 +9,49 @@ Here we propose Deep Learning models as a potential solution for such problem. W
 
 ---
 ## Table of Content
-TODO
+
 - [Project Structure](#1-project-structure)
 - [Installation](#2-installation)
 - [Data Acquisition](#3-data-acquisition)
   - [Source Databases](#31-source-databases)
 - [Data Preprocessing](#4-data-preprocessing)
   - [Format Raw Data](#41-format-raw-data-with-sequenceformatter-class)
-- [Models](#models)
-  - [Single-Rank Models](#single-rank-models)
-  - [Multi-Rank Models](#multi-rank-models)
-
+  - [Clean Data with `TaxonomyDataCleaner` class]()
+  - [Create Hierarchical Filtered Dataset with `TaxonomyDataFilter` class]()
+  - [Create Hierarchical Dataset with `TaxonomyDataFilter` class]()
+  - [Generating Parquet Files]()
+- [DNA Codification]()
+  - [K-merisation]()
+  - [4×N Matrix (4-row Matrix)]()
+  - [One-hot Encoding (Bit Encoding)]()
+- [Model Architectures](#models)
+  - [Enhanced Multi-Layer Perceptron (MLP)]()
+  - [Nanni CNN Variants]()
+    - [Nanni CNN1]()
+    - [Nanni CNN2]()
+    - [Nanni attention]()
+    - [BERT-based Model]()
+    - [Connected Models]()
+- [Configuration and Hyperparameters]()
+- [Training]()
+  - [Single-rank Models]()
+  - [Multirank (Hierarchical) Models]()
+- [Results]()
+- [DNA Prediction App]()
+  - [App Overview]()
+  - [Installation]()
+- [Experiments]()
+  - [Model Inference Using the DNA Predictor App]()
+    - [Perfect Classification of Known Taxa]()
+    - [Taxonomically Proximate Predictions for Unknown Taxa]()
+    - [Gap-Filling for Incomplete Taxonomic Data]()
+  - [Interpretability]()
+    - [PCA]()
+    - [Attention results]()
+- [License]()
+- [References]()
+- [Open Research Questions]()
+ 
 ---
 
 ---
