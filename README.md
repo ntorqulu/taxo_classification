@@ -871,7 +871,7 @@ We performed some interpretability analysis with two different models that could
 ##### 13.2.1 PCA
 We used [57 sequences](https://github.com/ntorqulu/taxo_classification/blob/main/PCA/real_seqs.tsv) from a real experiment that tried to detect invasive species in the harbour of Blanes to obtain their embeddings and compare the taxonomical classification performed with the standard software and pipelines for metabarcoding analisis with the PCA representation in 2D. The embedding was obtained by converting to a vector the output of the convolutional layer the trained Nanni_cnn1 model trained at different levels. We detected that those sequences identified as being part of the same genus were clustering together. In addition the separation of two clouds preserved the evolutive information at the phylum level in which we detected that the chordata were separated from the rest of the groups. See Figure 4 and Figure 5. 
 
-<img width="486" height="417" src="https://github.com/ntorqulu/taxo_classification/blob/main/PCA/pca_plot.png" />
+<img width="486" height="417" src="https://github.com/ntorqulu/taxo_classification/blob/main/PCA/genus.png" />
 
 *Figure 4: PCA representation of the embeddings obtained from the convolutional layer of the nanni_cnn1 at genus level*
 
@@ -880,6 +880,13 @@ We used [57 sequences](https://github.com/ntorqulu/taxo_classification/blob/main
 
 *Figure 5: PCA representation of the embeddings obtained from the convolutional layer of the nanni_cnn1 at phylum level*
 
+##### 13.2.2 Attention results
+
+We also performed an analysis calculating the mean values of the attention for the preddicion of certain groups. As shown in the Figure 6 animation, closer groups show higher values in the same positions and this pattern is repeated as the taxonomic level increase grouping the barcodes of the animation in the same group. 
+
+![Attention interpretation](https://github.com/ntorqulu/taxo_classification/blob/main/Results/PLOTS/ezgif-6cbd633b3cea46.gif)
+
+*Figure 6: Attention results showing simmilarities between related groups*
 
 **Conclusions:**
 
