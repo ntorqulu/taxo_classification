@@ -249,6 +249,8 @@ Three main approaches are implemented:
 **Code Reference:**  
 - [`src/models/architectures/`](src/models/architectures/)
 
+**Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
+
 Supported architectures:
 
 ### 5.1 Enhanced Multi-Layer Perceptron (MLP)
@@ -383,42 +385,63 @@ It has been trained with the following architecture parameters:
 
 
 ### 5.4 Connected Models
-- **File:** [`connected_model.py`]
-- **Description**: Different types of connected models. 
-- **Model types**:
-  - Iterative Fixed Input (`iterative`)   
- 
-         x = net1(x0)
-         x1 = net2(concat(x, x0))
-         x2 = net3(concat(x1, x0))
-         x3 = net4(concat(x2, x0))
+**Overview**  
+The connected models are an implementation of different connected models such as Iterative
+fixed input network, densely connected network (DenseNet), residual network (ResNet) or 
+recurrent refinement networks
 
-   - Densely Connected Convolutional Network or DenseNet (`densenet`)
- 
-         x1 = net1(x0)
-         x2 = net2(concat(x0, x1))
-         x3 = net3(concat(x0, x1, x2))
+**Architecture Details**  
+The connected models are implemented in [`connected_model.py`](src/models/architectures/connected_model.py) and features:
 
-   - Residual Network or ResNet (`resnet`)
+```
+class ConnectedModel(BaseModel):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int,
+                 hidden_size: int,
+                 models: list[nn.Module],
+                 dropout: float = 0.5,
+                 connected_type: str  = 'iterative',
+                 connected_models: dict[str, str] = None):
+```
+
+**Model types**
+
+Iterative Fixed Input (`iterative`)   
+ 
+    x = net1(x0)
+    x1 = net2(concat(x, x0))
+    x2 = net3(concat(x1, x0))
+    x3 = net4(concat(x2, x0))
+
+Densely Connected Network or DenseNet (`densenet`)
+ 
+    x1 = net1(x0)
+    x2 = net2(concat(x0, x1))
+    x3 = net3(concat(x0, x1, x2))
+
+Residual Network or ResNet (`resnet`)
   
-         x1 = net1(x0) + x0
-         x2 = net2(x1) + x1
-         x3 = net3(x2) + x2
+    x1 = net1(x0) + x0
+    x2 = net2(x1) + x1
+    x3 = net3(x2) + x2
 
-   - Recurrent refinement (`recurrent`):
+Recurrent refinement (`recurrent`):
 
-         x = net(x0)
-         x1 = net(concat(x, x0))
-         x2 = net(concat(x1, x0))
-         x3 = net(concat(x2, x0))
+    x = net(x0)
+    x1 = net(concat(x, x0))
+    x2 = net(concat(x1, x0))
+    x3 = net(concat(x2, x0))
 
-- **Configuration:** Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). For examples, 
+**Configuration:**
+
+Configurable via JSON files in [`src/models/hyperparams/singlerank/`](src/models/hyperparams/singlerank/). For examples, 
 you can check `connected_hparams.json` and the parameters `model_type`, `connected_type`, and `connected_models`.
+
 
 **Layer Architectures**  
 <img width="1256" height="708" alt="Connected Models Architectures" src="https://github.com/user-attachments/assets/f39aed16-cf3a-47d9-8707-0b61ce4e958b" />
 
-**Model selection is controlled via the `model_type` parameter in the configuration JSON files.**
 
 ---
 
@@ -631,7 +654,7 @@ In the `Results` folder, you will find the trained models. In each subfolder, yo
 - `.json`: a file with the parameters used for training.
 - `.log`: a file with the log output during training.
 - `README.md`: a file with the commands used to train the model.
-- 
+
 ---
 
 ## 12. DNA Prediction App
