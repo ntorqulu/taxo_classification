@@ -713,7 +713,7 @@ TTTAGCCTCTTCTTTAGGTCATAGAGGAAGCTCCGTGGACCTAGCAATTTTTTCTTTACATCTAGCAGGAGCTTCTTCTA
 ```
 
 - **Predicted Genus:** *Pontogammarus* 
-- **Taxonomic Relationship:** Both genera belong to the same family (Pontogammaridae) and order (Amphipoda)
+- **Taxonomic Relationship:** Both genera belong to the same family (Maeridae) and order (Amphipoda)
 - **Biological Significance:** The prediction demonstrates the model's ability to capture phylogenetic relationships
 
 
@@ -737,9 +737,9 @@ ATTGTCAAGAAATTTAGCTCATTCTGGGGCTGCATTAGATTGTGCTATTTTTTCACTTCATTTGGCTAGGGTTTCTAGTA
 
 | Taxonomic Rank | Taxon Name | Sample Count |
 |----------------|------------|--------------|
-| Order          | Stolidobranchia | 1,240 |
-| Family         | Styelidae | 45 |
-| Genus          | Botrylloides | 32 |
+| Order          | Stolidobranchia | 199 |
+| Family         | Styelidae | 133 |
+| Genus          | Botrylloides | 0 (absent) |
 | Species        | Not known | 0 (absent) |
 ```
 
