@@ -648,12 +648,34 @@ See `src/models/hyperparams/multirank/` for example configs for each model type 
 ---
 ## 11. Results
 
+**Trained Models**
+
 In the `Results` folder, you will find the trained models. In each subfolder, you'll find:
 
 - `*_best.pt`: the PyTorch checkpoint file.
 - `.json`: a file with the parameters used for training.
 - `.log`: a file with the log output during training.
 - `README.md`: a file with the commands used to train the model.
+
+**Architecture comparison**
+
+Order:
+
+<img width="863" height="731" alt="imatge" src="https://github.com/user-attachments/assets/0cd32484-d8f7-4dde-b978-5e40a5ecdfa2" />
+
+Genus:
+
+<img width="794" height="757" alt="imatge" src="https://github.com/user-attachments/assets/0521be14-be37-4a6e-a279-88b92c661087" />
+
+**Coding comparison**
+
+Order:
+
+<img width="759" height="767" alt="imatge" src="https://github.com/user-attachments/assets/f199a24f-0bb8-465e-8862-0e90a882f231" />
+
+Genus:
+
+<img width="754" height="766" alt="imatge" src="https://github.com/user-attachments/assets/80a0330d-096b-4220-882e-863fc8c8984b" />
 
 ---
 
