@@ -2,12 +2,12 @@
 
 This is the repository for the final project of the group under the supervision of Mariona Carós for the UPC School's Artificial Intelligence with Deep Learning postgraduate course, edition of summer 2024-2025. The team members are:
 
-    Adrià Antich
-    Ferran Busquets
-    Marta Bustins
-    Núria Torquet
+- [Adrià Antich](https://github.com/adriantich)
+- [Ferran Busquets](https://github.com/ferranb)
+- [Marta Bustins](https://github.com/MartaBustins)
+- [Núria Torquet](https://github.com/ntorqulu)
 
-Advised by Mariona Carós.
+Advised by [Mariona Carós](https://github.com/marionacaros).
 
 ## Introduction
 With the advent of the new DNA sequencing technologies, methodologies based on such thecniques have unveiled a bast field of applications to infer the Biodiversity of the ecosystems to monitorize such environments and their habitats. Among these thecniques DNA metabarcoding has emerged as a powerfull tool for biomonitoring. This thechnique relies on sequencing a targuet region of the genome of thousands of individuals at the same time and their latter assignment to the different taxa. However, one of the main constrains of the method is this taxonomic assignment due to the missing information in the databases and the amount of resources required to compute such analysis. While the latter problem has been assessed by using bigger computing services and optimizing the algorithms, to be able to run such models in the field withouth internet connection is still a challenge. 
